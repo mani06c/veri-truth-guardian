@@ -59,15 +59,10 @@ export default {
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
         'gradient-hero': 'var(--gradient-hero)',
-        'gradient-card': 'var(--gradient-card)',
+        'gradient-accent': 'var(--gradient-accent)',
       },
-      boxShadow: {
-        'sm': 'var(--shadow-sm)',
-        'md': 'var(--shadow-md)',
-        'lg': 'var(--shadow-lg)',
-      },
-      transitionProperty: {
-        'smooth': 'var(--transition-smooth)',
+      backdropBlur: {
+        xs: '2px',
       },
       borderRadius: {
         lg: "var(--radius)",

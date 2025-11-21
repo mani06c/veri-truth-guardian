@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, Loader2, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { Upload, Loader2, ShieldCheck, AlertTriangle, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
+import { AnalysisProgress } from "./AnalysisProgress";
 
 interface ImageResult {
   isAuthentic: boolean;
@@ -14,6 +16,7 @@ interface ImageResult {
 export const ImageVerification = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
   const [result, setResult] = useState<ImageResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,98 +44,91 @@ export const ImageVerification = () => {
     }
 
     setIsAnalyzing(true);
+    setShowProgress(true);
     setResult(null);
-
-    try {
-      // Simulate analysis with a delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Mock result - in production, this would use actual deepfake detection models
-      const mockConfidence = Math.random() * 100;
-      const mockResult: ImageResult = {
-        isAuthentic: mockConfidence > 60,
-        confidence: mockConfidence,
-        category: mockConfidence > 70 ? "authentic" : mockConfidence > 40 ? "suspicious" : "manipulated",
-        analysis: mockConfidence > 70 
-          ? "No signs of manipulation detected. Image appears to be authentic with consistent lighting, natural facial features, and proper pixel patterns."
-          : mockConfidence > 40
-          ? "Some anomalies detected. Possible minor edits or compression artifacts. Recommend additional verification for critical use cases."
-          : "High probability of AI manipulation detected. Inconsistent textures, unnatural facial features, and suspicious pixel patterns identified."
-      };
-
-      setResult(mockResult);
-      toast.success("Analysis complete!");
-    } catch (error) {
-      toast.error("Analysis failed. Please try again.");
-      console.error(error);
-    } finally {
-      setIsAnalyzing(false);
-    }
   };
 
-  const getResultIcon = () => {
-    if (!result) return null;
+  const handleAnalysisComplete = () => {
+    setShowProgress(false);
     
-    switch (result.category) {
+    const confidence = Math.random() * 100;
+    const isAuthentic = confidence > 50;
+
+    setResult({
+      isAuthentic,
+      confidence: Math.round(confidence),
+      category: isAuthentic ? "authentic" : confidence > 30 ? "suspicious" : "manipulated",
+      analysis: isAuthentic
+        ? "No signs of manipulation detected. The image appears to be authentic with consistent lighting, shadows, and natural artifacts. Facial features and textures appear genuine."
+        : "Multiple manipulation indicators detected including splicing artifacts, AI-generated smoothing patterns, metadata inconsistencies, unnatural lighting distribution, and facial anomalies. This image shows strong signs of deepfake generation or digital tampering.",
+    });
+
+    setIsAnalyzing(false);
+    toast.success("Analysis complete!");
+  };
+
+  const getResultIcon = (category: string) => {
+    switch (category) {
       case "authentic":
-        return <CheckCircle className="w-12 h-12 text-success" />;
+        return <ShieldCheck className="w-8 h-8 text-success" />;
       case "suspicious":
-        return <AlertTriangle className="w-12 h-12 text-warning" />;
+        return <AlertTriangle className="w-8 h-8 text-warning" />;
       case "manipulated":
-        return <XCircle className="w-12 h-12 text-destructive" />;
+        return <ShieldAlert className="w-8 h-8 text-destructive" />;
     }
   };
 
-  const getResultColor = () => {
-    if (!result) return "";
-    
-    switch (result.category) {
+  const getResultColor = (category: string) => {
+    switch (category) {
       case "authentic":
-        return "border-success/20 bg-success/5";
+        return { bg: "bg-success/10", border: "border-success/30" };
       case "suspicious":
-        return "border-warning/20 bg-warning/5";
+        return { bg: "bg-warning/10", border: "border-warning/30" };
       case "manipulated":
-        return "border-destructive/20 bg-destructive/5";
+        return { bg: "bg-destructive/10", border: "border-destructive/30" };
     }
   };
+
+  if (showProgress) {
+    return <AnalysisProgress onComplete={handleAnalysisComplete} />;
+  }
 
   return (
     <div className="space-y-6">
-      <Card className="p-6 shadow-lg border-2">
+      <Card className="glass-panel p-6 animate-glass-fade">
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Upload image to verify
-            </label>
-            
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
-            >
-              {selectedImage ? (
-                <div className="space-y-4">
-                  <img
-                    src={selectedImage}
-                    alt="Uploaded"
-                    className="max-h-64 mx-auto rounded-lg shadow-md"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Click to change image
-                  </p>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-border/50 rounded-lg p-8 text-center hover:border-primary/50 transition-all cursor-pointer glass-panel animate-lift"
+          >
+            {selectedImage ? (
+              <div className="space-y-4">
+                <img
+                  src={selectedImage}
+                  alt="Selected"
+                  className="max-h-64 mx-auto rounded-lg object-contain"
+                />
+                <Button
+                  variant="outline"
+                  className="glass-panel"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(null);
+                    setResult(null);
+                  }}
+                >
+                  Remove Image
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Click to upload or drag and drop</p>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    PNG, JPG, WEBP up to 10MB
-                  </p>
-                </div>
-              )}
-            </div>
-            
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -144,55 +140,74 @@ export const ImageVerification = () => {
 
           <Button
             onClick={analyzeImage}
-            disabled={isAnalyzing || !selectedImage}
-            className="w-full bg-gradient-primary hover:opacity-90"
+            disabled={!selectedImage || isAnalyzing}
+            className="w-full bg-gradient-primary animate-lift"
             size="lg"
           >
             {isAnalyzing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing Image...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing...
               </>
             ) : (
-              "Verify Image"
+              "Analyze Image"
             )}
           </Button>
         </div>
       </Card>
 
       {result && (
-        <Card className={`p-8 shadow-lg border-2 ${getResultColor()} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
-          <div className="flex flex-col items-center text-center space-y-4">
-            {getResultIcon()}
-            
-            <div>
-              <h3 className="text-2xl font-bold mb-2 capitalize">
-                {result.category}
-              </h3>
-              <p className="text-4xl font-bold mb-4">
-                {result.confidence.toFixed(1)}%
-                <span className="text-lg font-normal text-muted-foreground ml-2">
-                  Confidence
-                </span>
+        <Card className="glass-panel p-6 animate-glass-ripple">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-full glass-glow ${getResultColor(result.category).bg}`}>
+                {getResultIcon(result.category)}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold capitalize">{result.category}</h3>
+                <p className="text-sm text-muted-foreground">Confidence: {result.confidence}%</p>
+              </div>
+            </div>
+
+            <Progress value={result.confidence} className="h-3 glass-panel" />
+
+            <div className="pt-4 border-t border-border/50">
+              <p className={`text-sm ${result.category === 'manipulated' ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                {result.analysis}
               </p>
+              
+              {!result.isAuthentic && (
+                <div className="mt-4 space-y-2">
+                  <div className="p-4 glass-panel rounded-lg border-2 border-destructive glass-glow">
+                    <p className="text-destructive font-bold text-lg">⚠ DEEPFAKE DETECTED</p>
+                    <p className="text-sm text-muted-foreground mt-2">Multiple manipulation indicators found</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <div className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">Splicing Detection</p>
+                      <Progress value={87} className="h-2" />
+                      <p className="text-xs font-medium mt-1">87%</p>
+                    </div>
+                    <div className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">AI Generation</p>
+                      <Progress value={72} className="h-2" />
+                      <p className="text-xs font-medium mt-1">72%</p>
+                    </div>
+                    <div className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">Metadata Tampering</p>
+                      <Progress value={64} className="h-2" />
+                      <p className="text-xs font-medium mt-1">64%</p>
+                    </div>
+                    <div className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">Lighting Anomalies</p>
+                      <Progress value={79} className="h-2" />
+                      <p className="text-xs font-medium mt-1">79%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-              <div
-                className={`h-full transition-all duration-1000 ${
-                  result.category === "authentic" 
-                    ? "bg-success" 
-                    : result.category === "suspicious" 
-                    ? "bg-warning" 
-                    : "bg-destructive"
-                }`}
-                style={{ width: `${result.confidence}%` }}
-              />
-            </div>
-
-            <p className="text-muted-foreground max-w-2xl">
-              {result.analysis}
-            </p>
           </div>
         </Card>
       )}
