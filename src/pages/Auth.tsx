@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -7,30 +7,98 @@ import { useToast } from "@/hooks/use-toast";
 import { Github, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { z } from "zod";
+
+const authSchema = z.object({
+  email: z.string().trim().email({ message: "Invalid email address" }).max(255),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }).max(100)
+});
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signUp, signIn, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock authentication - replace with actual backend when Cloud is enabled
-    toast({
-      title: "Demo Mode",
-      description: "Enable Lovable Cloud to use real authentication. Redirecting to app...",
-    });
-    
-    setTimeout(() => navigate("/app"), 1500);
+    setLoading(true);
+
+    try {
+      const validation = authSchema.safeParse({ email, password });
+      
+      if (!validation.success) {
+        toast({
+          title: "Validation Error",
+          description: validation.error.errors[0].message,
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        
+        if (error) {
+          toast({
+            title: "Login Failed",
+            description: error.message === "Invalid login credentials" 
+              ? "Invalid email or password" 
+              : error.message,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You've successfully logged in."
+          });
+          navigate('/');
+        }
+      } else {
+        const { error } = await signUp(email, password);
+        
+        if (error) {
+          toast({
+            title: "Signup Failed",
+            description: error.message === "User already registered" 
+              ? "An account with this email already exists" 
+              : error.message,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Account Created!",
+            description: "Welcome! You can now access the app."
+          });
+          navigate('/');
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOAuth = (provider: string) => {
     toast({
-      title: "Demo Mode",
-      description: `${provider} login requires Lovable Cloud to be enabled.`,
+      title: "Coming Soon",
+      description: `${provider} login will be available soon.`,
     });
   };
 
@@ -77,8 +145,19 @@ export default function Auth() {
             />
           </div>
 
-          <Button type="submit" className="w-full bg-gradient-primary animate-lift">
-            {isLogin ? "Sign In" : "Sign Up"}
+          <Button 
+            type="submit" 
+            className="w-full bg-gradient-primary animate-lift"
+            disabled={loading}
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                {isLogin ? "Signing In..." : "Signing Up..."}
+              </div>
+            ) : (
+              isLogin ? "Sign In" : "Sign Up"
+            )}
           </Button>
         </form>
 
