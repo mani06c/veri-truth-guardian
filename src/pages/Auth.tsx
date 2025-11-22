@@ -8,6 +8,7 @@ import { Github, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const authSchema = z.object({
@@ -95,11 +96,32 @@ export default function Auth() {
     }
   };
 
-  const handleOAuth = (provider: string) => {
-    toast({
-      title: "Coming Soon",
-      description: `${provider} login will be available soon.`,
-    });
+  const handleOAuth = async (provider: 'google' | 'github') => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        toast({
+          title: "OAuth Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to initiate OAuth login. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -174,8 +196,9 @@ export default function Auth() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => handleOAuth("Google")}
+            onClick={() => handleOAuth("google")}
             className="glass-panel animate-lift"
+            disabled={loading}
           >
             <Mail className="mr-2 h-4 w-4" />
             Google
@@ -183,8 +206,9 @@ export default function Auth() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => handleOAuth("GitHub")}
+            onClick={() => handleOAuth("github")}
             className="glass-panel animate-lift"
+            disabled={loading}
           >
             <Github className="mr-2 h-4 w-4" />
             GitHub
