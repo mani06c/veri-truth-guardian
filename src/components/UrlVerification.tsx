@@ -12,6 +12,12 @@ interface UrlResult {
   confidence: number;
   category: "credible" | "questionable" | "misinformation";
   analysis: string;
+  credibilityScores?: {
+    sourceCredibility: number;
+    factVerification: number;
+    domainReputation: number;
+    citationQuality: number;
+  };
 }
 
 export const UrlVerification = () => {
@@ -39,23 +45,38 @@ export const UrlVerification = () => {
     setResult(null);
   };
 
-  const handleAnalysisComplete = () => {
+  const handleAnalysisComplete = async () => {
     setShowProgress(false);
     
-    const confidence = Math.random() * 100;
-    const isCredible = confidence > 50;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      const { data, error } = await supabase.functions.invoke('verify-url', {
+        body: { url }
+      });
 
-    setResult({
-      isCredible,
-      confidence: Math.round(confidence),
-      category: isCredible ? "credible" : confidence > 30 ? "questionable" : "misinformation",
-      analysis: isCredible
-        ? "Website appears credible. Domain has verified SSL certificate, established history, authoritative sources cited, and cross-referenced with fact-checking databases. Content shows journalistic standards."
-        : "Critical credibility issues detected. Website shows characteristics of misinformation sources including suspicious domain age, lack of verifiable sources, biased language patterns, inconsistent facts, and presence on known misinformation watchlists. Content fails fact-checking verification.",
-    });
+      if (error) throw error;
 
-    setIsAnalyzing(false);
-    toast.success("Analysis complete!");
+      setResult({
+        isCredible: data.isCredible,
+        confidence: data.confidence,
+        category: data.category,
+        analysis: data.analysis,
+      });
+
+      toast.success("Analysis complete!");
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast.error("Analysis failed. Please try again.");
+      setResult({
+        isCredible: false,
+        confidence: 0,
+        category: "misinformation",
+        analysis: "An error occurred during analysis. Please try again.",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getResultIcon = (category: string) => {
@@ -143,28 +164,30 @@ export const UrlVerification = () => {
                     <p className="text-sm text-muted-foreground mt-2">This website shows multiple credibility issues</p>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Source Credibility</p>
-                      <Progress value={15} className="h-2" />
-                      <p className="text-xs font-medium mt-1">15%</p>
+                  {result.credibilityScores && (
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Source Credibility</p>
+                        <Progress value={result.credibilityScores.sourceCredibility} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.credibilityScores.sourceCredibility}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Fact Verification</p>
+                        <Progress value={result.credibilityScores.factVerification} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.credibilityScores.factVerification}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Domain Reputation</p>
+                        <Progress value={result.credibilityScores.domainReputation} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.credibilityScores.domainReputation}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Citation Quality</p>
+                        <Progress value={result.credibilityScores.citationQuality} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.credibilityScores.citationQuality}%</p>
+                      </div>
                     </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Fact Verification</p>
-                      <Progress value={22} className="h-2" />
-                      <p className="text-xs font-medium mt-1">22%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Domain Reputation</p>
-                      <Progress value={18} className="h-2" />
-                      <p className="text-xs font-medium mt-1">18%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Citation Quality</p>
-                      <Progress value={12} className="h-2" />
-                      <p className="text-xs font-medium mt-1">12%</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

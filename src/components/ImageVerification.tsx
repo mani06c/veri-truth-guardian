@@ -11,6 +11,12 @@ interface ImageResult {
   confidence: number;
   category: "authentic" | "suspicious" | "manipulated";
   analysis: string;
+  detectionScores?: {
+    splicing: number;
+    aiGeneration: number;
+    metadata: number;
+    lighting: number;
+  };
 }
 
 export const ImageVerification = () => {
@@ -48,23 +54,38 @@ export const ImageVerification = () => {
     setResult(null);
   };
 
-  const handleAnalysisComplete = () => {
+  const handleAnalysisComplete = async () => {
     setShowProgress(false);
     
-    const confidence = Math.random() * 100;
-    const isAuthentic = confidence > 50;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      const { data, error } = await supabase.functions.invoke('verify-image', {
+        body: { imageData: selectedImage }
+      });
 
-    setResult({
-      isAuthentic,
-      confidence: Math.round(confidence),
-      category: isAuthentic ? "authentic" : confidence > 30 ? "suspicious" : "manipulated",
-      analysis: isAuthentic
-        ? "No signs of manipulation detected. The image appears to be authentic with consistent lighting, shadows, and natural artifacts. Facial features and textures appear genuine."
-        : "Multiple manipulation indicators detected including splicing artifacts, AI-generated smoothing patterns, metadata inconsistencies, unnatural lighting distribution, and facial anomalies. This image shows strong signs of deepfake generation or digital tampering.",
-    });
+      if (error) throw error;
 
-    setIsAnalyzing(false);
-    toast.success("Analysis complete!");
+      setResult({
+        isAuthentic: data.isAuthentic,
+        confidence: data.confidence,
+        category: data.category,
+        analysis: data.analysis,
+      });
+
+      toast.success("Analysis complete!");
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast.error("Analysis failed. Please try again.");
+      setResult({
+        isAuthentic: false,
+        confidence: 0,
+        category: "manipulated",
+        analysis: "An error occurred during analysis. Please try again.",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getResultIcon = (category: string) => {
@@ -183,28 +204,30 @@ export const ImageVerification = () => {
                     <p className="text-sm text-muted-foreground mt-2">Multiple manipulation indicators found</p>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Splicing Detection</p>
-                      <Progress value={87} className="h-2" />
-                      <p className="text-xs font-medium mt-1">87%</p>
+                  {result.detectionScores && (
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Splicing Detection</p>
+                        <Progress value={result.detectionScores.splicing} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.splicing}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">AI Generation</p>
+                        <Progress value={result.detectionScores.aiGeneration} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.aiGeneration}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Metadata Tampering</p>
+                        <Progress value={result.detectionScores.metadata} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.metadata}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Lighting Anomalies</p>
+                        <Progress value={result.detectionScores.lighting} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.lighting}%</p>
+                      </div>
                     </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">AI Generation</p>
-                      <Progress value={72} className="h-2" />
-                      <p className="text-xs font-medium mt-1">72%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Metadata Tampering</p>
-                      <Progress value={64} className="h-2" />
-                      <p className="text-xs font-medium mt-1">64%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Lighting Anomalies</p>
-                      <Progress value={79} className="h-2" />
-                      <p className="text-xs font-medium mt-1">79%</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
