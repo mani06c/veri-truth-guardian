@@ -11,6 +11,12 @@ interface VideoResult {
   confidence: number;
   category: "authentic" | "suspicious" | "deepfake";
   analysis: string;
+  detectionScores?: {
+    facialManipulation: number;
+    lipSync: number;
+    temporalConsistency: number;
+    ganArtifacts: number;
+  };
 }
 
 export const VideoVerification = () => {
@@ -48,23 +54,38 @@ export const VideoVerification = () => {
     setResult(null);
   };
 
-  const handleAnalysisComplete = () => {
+  const handleAnalysisComplete = async () => {
     setShowProgress(false);
     
-    const confidence = Math.random() * 100;
-    const isAuthentic = confidence > 50;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      const { data, error } = await supabase.functions.invoke('verify-video', {
+        body: { videoData: selectedVideo }
+      });
 
-    setResult({
-      isAuthentic,
-      confidence: Math.round(confidence),
-      category: isAuthentic ? "authentic" : confidence > 30 ? "suspicious" : "deepfake",
-      analysis: isAuthentic
-        ? "Video appears authentic. No signs of deepfake manipulation detected. Facial movements, lip-sync, and temporal consistency are natural. Audio-visual alignment is genuine."
-        : "Critical deepfake indicators detected including temporal inconsistencies, unnatural facial movements, lip-sync anomalies, GAN artifacts, frame-by-frame manipulation traces, and suspicious audio patterns. This video shows strong evidence of AI-generated deepfake technology.",
-    });
+      if (error) throw error;
 
-    setIsAnalyzing(false);
-    toast.success("Analysis complete!");
+      setResult({
+        isAuthentic: data.isAuthentic,
+        confidence: data.confidence,
+        category: data.category,
+        analysis: data.analysis,
+      });
+
+      toast.success("Analysis complete!");
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast.error("Analysis failed. Please try again.");
+      setResult({
+        isAuthentic: false,
+        confidence: 0,
+        category: "deepfake",
+        analysis: "An error occurred during analysis. Please try again.",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getResultIcon = (category: string) => {
@@ -183,28 +204,30 @@ export const VideoVerification = () => {
                     <p className="text-sm text-muted-foreground mt-2">Multiple manipulation indicators found in video frames</p>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Facial Manipulation</p>
-                      <Progress value={91} className="h-2" />
-                      <p className="text-xs font-medium mt-1">91%</p>
+                  {result.detectionScores && (
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Facial Manipulation</p>
+                        <Progress value={result.detectionScores.facialManipulation} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.facialManipulation}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Lip-Sync Anomalies</p>
+                        <Progress value={result.detectionScores.lipSync} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.lipSync}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Temporal Inconsistency</p>
+                        <Progress value={result.detectionScores.temporalConsistency} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.temporalConsistency}%</p>
+                      </div>
+                      <div className="p-3 glass-panel rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">GAN Artifacts</p>
+                        <Progress value={result.detectionScores.ganArtifacts} className="h-2" />
+                        <p className="text-xs font-medium mt-1">{result.detectionScores.ganArtifacts}%</p>
+                      </div>
                     </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Lip-Sync Anomalies</p>
-                      <Progress value={85} className="h-2" />
-                      <p className="text-xs font-medium mt-1">85%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">Temporal Inconsistency</p>
-                      <Progress value={78} className="h-2" />
-                      <p className="text-xs font-medium mt-1">78%</p>
-                    </div>
-                    <div className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">GAN Artifacts</p>
-                      <Progress value={83} className="h-2" />
-                      <p className="text-xs font-medium mt-1">83%</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

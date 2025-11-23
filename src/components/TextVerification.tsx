@@ -31,23 +31,38 @@ export const TextVerification = () => {
     setResult(null);
   };
 
-  const handleAnalysisComplete = () => {
+  const handleAnalysisComplete = async () => {
     setShowProgress(false);
     
-    const confidence = Math.random() * 100;
-    const isAuthentic = confidence > 50;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      const { data, error } = await supabase.functions.invoke('verify-text', {
+        body: { text }
+      });
 
-    setResult({
-      isAuthentic,
-      confidence: Math.round(confidence),
-      category: isAuthentic ? "authentic" : confidence > 30 ? "suspicious" : "fake",
-      analysis: isAuthentic
-        ? "The text appears to be authentic with no signs of AI generation or manipulation. Language patterns and factual consistency suggest reliability."
-        : "The text shows signs of potential manipulation or AI generation. Multiple indicators suggest this content may be fabricated, misleading, or contain unverified claims. High likelihood of misinformation detected.",
-    });
+      if (error) throw error;
 
-    setIsAnalyzing(false);
-    toast.success("Analysis complete!");
+      setResult({
+        isAuthentic: data.isAuthentic,
+        confidence: data.confidence,
+        category: data.category,
+        analysis: data.analysis,
+      });
+
+      toast.success("Analysis complete!");
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast.error("Analysis failed. Please try again.");
+      setResult({
+        isAuthentic: false,
+        confidence: 0,
+        category: "fake",
+        analysis: "An error occurred during analysis. Please try again.",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getResultIcon = (category: string) => {
