@@ -35,18 +35,34 @@ export const VerificationSection = () => {
           </TabsList>
 
           <TabsContent value="text" className="mt-0">
+            <div className="mb-6 text-center">
+              <h3 className="text-2xl font-semibold mb-2">Text Fake News Detection</h3>
+              <p className="text-muted-foreground">Analyze text content for misinformation and AI-generated content</p>
+            </div>
             <TextVerification />
           </TabsContent>
 
           <TabsContent value="image" className="mt-0">
+            <div className="mb-6 text-center">
+              <h3 className="text-2xl font-semibold mb-2">Image Deepfake Detection</h3>
+              <p className="text-muted-foreground">Detect manipulated or AI-generated images</p>
+            </div>
             <ImageVerification />
           </TabsContent>
 
           <TabsContent value="video" className="mt-0">
+            <div className="mb-6 text-center">
+              <h3 className="text-2xl font-semibold mb-2">Video Deepfake Analysis</h3>
+              <p className="text-muted-foreground">Identify deepfake videos and manipulation patterns</p>
+            </div>
             <VideoVerification />
           </TabsContent>
 
           <TabsContent value="url" className="mt-0">
+            <div className="mb-6 text-center">
+              <h3 className="text-2xl font-semibold mb-2">URL Fact-Checking</h3>
+              <p className="text-muted-foreground">Verify website credibility and content authenticity</p>
+            </div>
             <UrlVerification />
           </TabsContent>
         </Tabs>
