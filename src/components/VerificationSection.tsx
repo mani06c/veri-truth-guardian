@@ -5,8 +5,12 @@ import { ImageVerification } from "./ImageVerification";
 import { VideoVerification } from "./VideoVerification";
 import { UrlVerification } from "./UrlVerification";
 
-export const VerificationSection = () => {
-  const [activeTab, setActiveTab] = useState("text");
+interface VerificationSectionProps {
+  initialMode?: string;
+}
+
+export const VerificationSection = ({ initialMode = "text" }: VerificationSectionProps) => {
+  const [activeTab, setActiveTab] = useState(initialMode);
 
   return (
     <section id="verify" className="py-20 px-4 bg-background">
