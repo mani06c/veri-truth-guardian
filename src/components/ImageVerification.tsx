@@ -6,11 +6,18 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 
+interface DetectedEffect {
+  name: string;
+  confidence: number;
+  severity?: "subtle" | "moderate" | "strong";
+}
+
 interface ImageResult {
   isAuthentic: boolean;
   confidence: number;
   category: "authentic" | "suspicious" | "manipulated";
   verdict?: string;
+  sourceType?: "camera" | "lightly-edited" | "heavily-edited" | "ai-generated";
   analysis: string;
   detectionScores?: {
     aiGeneration: number;
@@ -18,7 +25,21 @@ interface ImageResult {
     lighting: number;
     metadata: number;
   };
+  effects?: DetectedEffect[];
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  "camera": "Original camera photo",
+  "lightly-edited": "Lightly edited",
+  "heavily-edited": "Heavily edited",
+  "ai-generated": "AI-generated",
+};
+
+const SEVERITY_CLS: Record<string, string> = {
+  subtle: "bg-muted/40 border-border/50 text-foreground",
+  moderate: "bg-warning/15 border-warning/40 text-warning",
+  strong: "bg-destructive/15 border-destructive/40 text-destructive",
+};
 
 export const ImageVerification = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

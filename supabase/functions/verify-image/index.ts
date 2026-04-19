@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Analyzing image for AI generation / manipulation...');
+    console.log('Analyzing image for AI generation / manipulation / edits...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -38,15 +38,15 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a forensic image analyst specialized in detecting AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Sora, Gemini Imagen), deepfakes, GAN outputs, and any digital manipulation (splicing, retouching, face swaps, inpainting).
+            content: `You are a forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects (filters, retouching, color grading, background replacement, beauty filters, HDR, sharpening).
 
 Examine the image carefully for:
-- AI generation signatures: over-smooth skin, perfect symmetry, melting/blurred fingers and teeth, illegible text, repeating patterns, plastic textures, unnatural eye reflections, broken jewelry/glasses
-- Deepfake signs: face/neck blending mismatch, lighting direction mismatch on the face, asymmetric earrings, inconsistent ear shape, blurry hair edges
+- AI generation: over-smooth skin, perfect symmetry, melting/blurred fingers and teeth, illegible text, repeating patterns, plastic textures, unnatural eye reflections
+- Deepfake: face/neck blending mismatch, lighting direction mismatch, asymmetric earrings, inconsistent ear shape, blurry hair edges
 - Manipulation: cloned regions, mismatched noise, soft edges around objects, inconsistent shadows or perspective
-- Compression and metadata clues visible in pixels
+- Edits & effects: Instagram-style filter, vignette, heavy color grading, beauty/skin smoothing filter, teeth whitening, eye enlargement, slimming/reshaping, background blur or replacement, sky replacement, object removal, HDR boost, oversharpening, noise reduction, exposure/contrast/saturation push, black-and-white conversion, film grain added
 
-Be decisive. If the image looks AI-generated or manipulated, say so with high confidence.
+Be decisive. Distinguish between an unedited camera photo, a lightly edited photo, a heavily edited photo, and a fully AI-generated image.
 
 Return ONLY a valid JSON object, no prose, no markdown fences:
 {
@@ -54,16 +54,21 @@ Return ONLY a valid JSON object, no prose, no markdown fences:
   "confidence": number,
   "category": "authentic" | "suspicious" | "manipulated",
   "verdict": "Real" | "AI-Generated" | "Manipulated" | "Suspicious",
+  "sourceType": "camera" | "lightly-edited" | "heavily-edited" | "ai-generated",
   "analysis": "2-4 sentence forensic explanation citing specific visual evidence",
   "detectionScores": {
     "aiGeneration": number,
     "splicing": number,
     "lighting": number,
     "metadata": number
-  }
+  },
+  "effects": [
+    { "name": "short label e.g. Beauty filter", "confidence": number, "severity": "subtle" | "moderate" | "strong" }
+  ]
 }
 
-confidence = how sure you are of the verdict (0-100). Scores are 0-100 where higher = more suspicious.`
+isAuthentic = true ONLY for an unedited or lightly edited real photo. Mark false if AI-generated, deepfaked, or heavily manipulated.
+confidence = how sure you are of the verdict (0-100). detectionScores are 0-100 where higher = more suspicious. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.`
           },
           {
             role: 'user',
@@ -112,8 +117,10 @@ confidence = how sure you are of the verdict (0-100). Scores are 0-100 where hig
         confidence: 0,
         category: 'suspicious',
         verdict: 'Suspicious',
+        sourceType: 'camera',
         analysis: 'An error occurred during analysis. Please try again.',
-        detectionScores: { aiGeneration: 0, splicing: 0, lighting: 0, metadata: 0 }
+        detectionScores: { aiGeneration: 0, splicing: 0, lighting: 0, metadata: 0 },
+        effects: []
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
