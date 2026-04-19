@@ -6,11 +6,18 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 
+interface DetectedEffect {
+  name: string;
+  confidence: number;
+  severity?: "subtle" | "moderate" | "strong";
+}
+
 interface ImageResult {
   isAuthentic: boolean;
   confidence: number;
   category: "authentic" | "suspicious" | "manipulated";
   verdict?: string;
+  sourceType?: "camera" | "lightly-edited" | "heavily-edited" | "ai-generated";
   analysis: string;
   detectionScores?: {
     aiGeneration: number;
@@ -18,7 +25,21 @@ interface ImageResult {
     lighting: number;
     metadata: number;
   };
+  effects?: DetectedEffect[];
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  "camera": "Original camera photo",
+  "lightly-edited": "Lightly edited",
+  "heavily-edited": "Heavily edited",
+  "ai-generated": "AI-generated",
+};
+
+const SEVERITY_CLS: Record<string, string> = {
+  subtle: "bg-muted/40 border-border/50 text-foreground",
+  moderate: "bg-warning/15 border-warning/40 text-warning",
+  strong: "bg-destructive/15 border-destructive/40 text-destructive",
+};
 
 export const ImageVerification = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -177,17 +198,41 @@ export const ImageVerification = () => {
       {result && (
         <Card className="glass-panel p-6 animate-glass-ripple">
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="text-lg font-semibold capitalize">
                   {result.verdict || result.category}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Confidence: {result.confidence}%
+                  {result.sourceType && (
+                    <> · <span className="font-medium">{SOURCE_LABELS[result.sourceType] || result.sourceType}</span></>
+                  )}
                 </p>
               </div>
               <Progress value={result.confidence} className="h-3 w-1/2 glass-panel" />
             </div>
+
+            {result.effects && result.effects.length > 0 && (
+              <div className="space-y-2 border-t border-border/50 pt-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Detected edits & effects
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {result.effects.map((eff, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs ${SEVERITY_CLS[eff.severity || "subtle"]}`}
+                      title={`${eff.confidence}% confidence`}
+                    >
+                      <span className="font-medium">{eff.name}</span>
+                      <span className="opacity-70">{eff.confidence}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">
               {result.analysis}
             </p>
