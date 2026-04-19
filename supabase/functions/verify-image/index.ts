@@ -18,7 +18,14 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Analyzing image for deepfake detection...');
+    if (!imageData) {
+      return new Response(
+        JSON.stringify({ error: 'imageData is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Analyzing image for AI generation / manipulation...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -31,43 +38,38 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert in deepfake detection and image forensics. Analyze the provided image for signs of manipulation, AI generation, or deepfake technology.
+            content: `You are a forensic image analyst specialized in detecting AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Sora, Gemini Imagen), deepfakes, GAN outputs, and any digital manipulation (splicing, retouching, face swaps, inpainting).
 
-Consider these factors:
-- Facial inconsistencies (unnatural features, misaligned elements)
-- Lighting and shadow anomalies
-- Edge artifacts and blending issues
-- Signs of GAN generation (smoothing, repetitive patterns)
-- Metadata inconsistencies
-- Unnatural textures or skin appearance
+Examine the image carefully for:
+- AI generation signatures: over-smooth skin, perfect symmetry, melting/blurred fingers and teeth, illegible text, repeating patterns, plastic textures, unnatural eye reflections, broken jewelry/glasses
+- Deepfake signs: face/neck blending mismatch, lighting direction mismatch on the face, asymmetric earrings, inconsistent ear shape, blurry hair edges
+- Manipulation: cloned regions, mismatched noise, soft edges around objects, inconsistent shadows or perspective
+- Compression and metadata clues visible in pixels
 
-Respond ONLY with a JSON object in this exact format:
+Be decisive. If the image looks AI-generated or manipulated, say so with high confidence.
+
+Return ONLY a valid JSON object, no prose, no markdown fences:
 {
   "isAuthentic": boolean,
-  "confidence": number (0-100),
+  "confidence": number,
   "category": "authentic" | "suspicious" | "manipulated",
-  "analysis": "detailed explanation of your findings",
+  "verdict": "Real" | "AI-Generated" | "Manipulated" | "Suspicious",
+  "analysis": "2-4 sentence forensic explanation citing specific visual evidence",
   "detectionScores": {
-    "splicing": number (0-100),
-    "aiGeneration": number (0-100),
-    "metadata": number (0-100),
-    "lighting": number (0-100)
+    "aiGeneration": number,
+    "splicing": number,
+    "lighting": number,
+    "metadata": number
   }
-}`
+}
+
+confidence = how sure you are of the verdict (0-100). Scores are 0-100 where higher = more suspicious.`
           },
           {
             role: 'user',
             content: [
-              {
-                type: 'text',
-                text: 'Analyze this image for deepfake or manipulation indicators:'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageData
-                }
-              }
+              { type: 'text', text: 'Analyze this image. Is it real, AI-generated, or manipulated?' },
+              { type: 'image_url', image_url: { url: imageData } }
             ]
           }
         ],
@@ -77,46 +79,43 @@ Respond ONLY with a JSON object in this exact format:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('AI gateway error:', response.status, errorText);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit reached, please try again shortly.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted. Add credits in Lovable Cloud settings.' }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
     const data = await response.json();
     const resultText = data.choices[0].message.content;
-    
     console.log('AI Response:', resultText);
 
-    // Parse the JSON response
     const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse AI response');
-    }
-
+    if (!jsonMatch) throw new Error('Failed to parse AI response');
     const result = JSON.parse(jsonMatch[0]);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     console.error('Error in verify-image function:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
         isAuthentic: false,
         confidence: 0,
-        category: 'manipulated',
+        category: 'suspicious',
+        verdict: 'Suspicious',
         analysis: 'An error occurred during analysis. Please try again.',
-        detectionScores: {
-          splicing: 0,
-          aiGeneration: 0,
-          metadata: 0,
-          lighting: 0
-        }
+        detectionScores: { aiGeneration: 0, splicing: 0, lighting: 0, metadata: 0 }
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -11,17 +11,23 @@ serve(async (req) => {
   }
 
   try {
-    const { videoData } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const body = await req.json();
+    // Accept a single frame (data URL) for real-time scan
+    const frame: string | undefined = body.frame;
+    const timestamp: number | undefined = body.timestamp;
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
+
+    if (!frame) {
+      return new Response(
+        JSON.stringify({ error: 'frame (data URL) is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log('Analyzing video for deepfake detection...');
+    console.log(`Analyzing video frame at t=${timestamp ?? 0}s`);
 
-    // Note: Full video analysis requires frame extraction which is complex
-    // This is a simplified version that provides realistic analysis patterns
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -33,33 +39,38 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert in video deepfake detection and forensic analysis. Provide a realistic analysis based on common deepfake patterns.
+            content: `You are a forensic video analyst inspecting a single frame from a video to detect AI generation (Sora, Runway, Pika, Veo, Kling) and deepfakes (face swap, lip-sync manipulation, full-body puppetry).
 
-Consider these factors:
-- Temporal consistency across frames
-- Facial movement naturalness
-- Lip-sync accuracy
-- Audio-visual alignment
-- Frame-by-frame artifacts
-- GAN generation patterns
+Look for:
+- Face boundary blending, mismatched skin tone at jawline, flickering edges
+- Eye and teeth artifacts, asymmetric facial details
+- Lip-shape mismatch with expected speech, unnatural mouth interior
+- AI video signatures: morphing backgrounds, warping objects, hands with wrong finger counts, melting hair, plastic skin, unnatural lighting on face vs body
+- GAN/diffusion fingerprints: micro repeating textures, smoothed details
 
-Respond ONLY with a JSON object in this exact format:
+Be decisive. Return ONLY valid JSON, no markdown:
 {
   "isAuthentic": boolean,
-  "confidence": number (0-100),
+  "confidence": number,
   "category": "authentic" | "suspicious" | "deepfake",
-  "analysis": "detailed explanation of your findings",
+  "verdict": "Real" | "AI-Generated" | "Deepfake" | "Suspicious",
+  "analysis": "2-4 sentence forensic explanation citing specific visual evidence in the frame",
   "detectionScores": {
-    "facialManipulation": number (0-100),
-    "lipSync": number (0-100),
-    "temporalConsistency": number (0-100),
-    "ganArtifacts": number (0-100)
+    "facialManipulation": number,
+    "lipSync": number,
+    "temporalConsistency": number,
+    "ganArtifacts": number
   }
-}`
+}
+
+Scores 0-100, higher = more suspicious.`
           },
           {
             role: 'user',
-            content: 'Analyze this video data for deepfake indicators. Provide realistic detection scores based on typical deepfake patterns.'
+            content: [
+              { type: 'text', text: `Analyze this video frame${timestamp != null ? ` (t=${timestamp.toFixed(1)}s)` : ''}. Is it real, AI-generated, or a deepfake?` },
+              { type: 'image_url', image_url: { url: frame } }
+            ]
           }
         ],
       }),
@@ -68,46 +79,44 @@ Respond ONLY with a JSON object in this exact format:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('AI gateway error:', response.status, errorText);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit reached, please try again shortly.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted. Add credits in Lovable Cloud settings.' }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
     const data = await response.json();
     const resultText = data.choices[0].message.content;
-    
     console.log('AI Response:', resultText);
 
-    // Parse the JSON response
     const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse AI response');
-    }
-
+    if (!jsonMatch) throw new Error('Failed to parse AI response');
     const result = JSON.parse(jsonMatch[0]);
+    if (timestamp != null) result.timestamp = timestamp;
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     console.error('Error in verify-video function:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
         isAuthentic: false,
         confidence: 0,
-        category: 'deepfake',
+        category: 'suspicious',
+        verdict: 'Suspicious',
         analysis: 'An error occurred during analysis. Please try again.',
-        detectionScores: {
-          facialManipulation: 0,
-          lipSync: 0,
-          temporalConsistency: 0,
-          ganArtifacts: 0
-        }
+        detectionScores: { facialManipulation: 0, lipSync: 0, temporalConsistency: 0, ganArtifacts: 0 }
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
