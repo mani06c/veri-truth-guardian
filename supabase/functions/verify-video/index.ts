@@ -39,7 +39,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a forensic video analyst inspecting a single frame from a video to detect AI generation (Sora, Runway, Pika, Veo, Kling) and deepfakes (face swap, lip-sync manipulation, full-body puppetry).
+            content: `You are a forensic video analyst inspecting a single frame from a video to detect AI generation (Sora, Runway, Pika, Veo, Kling) and deepfakes (face swap, lip-sync manipulation, full-body puppetry, voice cloning).
 
 Look for:
 - Face boundary blending, mismatched skin tone at jawline, flickering edges
@@ -47,6 +47,7 @@ Look for:
 - Lip-shape mismatch with expected speech, unnatural mouth interior
 - AI video signatures: morphing backgrounds, warping objects, hands with wrong finger counts, melting hair, plastic skin, unnatural lighting on face vs body
 - GAN/diffusion fingerprints: micro repeating textures, smoothed details
+- Voice authenticity cues visible in the frame: lip/jaw sync with expected speech, facial muscle engagement during speech
 
 Be decisive. Return ONLY valid JSON, no markdown:
 {
@@ -59,11 +60,16 @@ Be decisive. Return ONLY valid JSON, no markdown:
     "facialManipulation": number,
     "lipSync": number,
     "temporalConsistency": number,
-    "ganArtifacts": number
-  }
+    "ganArtifacts": number,
+    "voiceAuthenticity": number
+  },
+  "suspiciousRegions": [
+    { "area": "short label e.g. jawline blend", "severity": "low" | "medium" | "high" }
+  ],
+  "frameFlags": ["list of specific issues found in this frame"]
 }
 
-Scores 0-100, higher = more suspicious.`
+Scores 0-100, higher = more suspicious. suspiciousRegions lists areas where anomalies are visible. frameFlags are short string labels for each issue detected.`
           },
           {
             role: 'user',
