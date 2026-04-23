@@ -38,7 +38,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects (filters, retouching, color grading, background replacement, beauty filters, HDR, sharpening).
+            content: `You are a forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects (filters, retouching, color grading, background replacement, beauty filters, HDR, sharpening). You also identify suspicious REGIONS in the image.
 
 Examine the image carefully for:
 - AI generation: over-smooth skin, perfect symmetry, melting/blurred fingers and teeth, illegible text, repeating patterns, plastic textures, unnatural eye reflections
@@ -64,11 +64,19 @@ Return ONLY a valid JSON object, no prose, no markdown fences:
   },
   "effects": [
     { "name": "short label e.g. Beauty filter", "confidence": number, "severity": "subtle" | "moderate" | "strong" }
+  ],
+  "regions": [
+    {
+      "label": "short description e.g. Face blend edge",
+      "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0,
+      "severity": "low" | "medium" | "high"
+    }
   ]
 }
 
 isAuthentic = true ONLY for an unedited or lightly edited real photo. Mark false if AI-generated, deepfaked, or heavily manipulated.
-confidence = how sure you are of the verdict (0-100). detectionScores are 0-100 where higher = more suspicious. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.`
+confidence = how sure you are of the verdict (0-100). detectionScores are 0-100 where higher = more suspicious. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.
+regions is an array of suspicious areas. x,y,w,h are normalized 0-1 fractions of image dimensions (top-left origin). Only include regions where manipulation or AI artifacts are visible. For authentic images return an empty array.`
           },
           {
             role: 'user',
