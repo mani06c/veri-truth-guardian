@@ -20,7 +20,10 @@ interface FrameResult {
     lipSync: number;
     temporalConsistency: number;
     ganArtifacts: number;
+    voiceAuthenticity?: number;
   };
+  suspiciousRegions?: { area: string; severity: "low" | "medium" | "high" }[];
+  frameFlags?: string[];
 }
 
 const SCAN_INTERVAL_MS = 5000;
@@ -260,18 +263,43 @@ export const VideoVerification = () => {
 
             {latest.detectionScores && (
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {[
+                {([
                   ["Facial Manipulation", latest.detectionScores.facialManipulation],
                   ["Lip-Sync Anomalies", latest.detectionScores.lipSync],
                   ["Temporal Inconsistency", latest.detectionScores.temporalConsistency],
                   ["GAN Artifacts", latest.detectionScores.ganArtifacts],
-                ].map(([label, val]) => (
+                  ...(latest.detectionScores.voiceAuthenticity != null ? [["Voice Authenticity", latest.detectionScores.voiceAuthenticity] as const] : []),
+                ] as const).map(([label, val]) => (
                   <div key={label as string} className="p-3 glass-panel rounded-lg">
                     <p className="text-xs text-muted-foreground mb-2">{label}</p>
                     <Progress value={val as number} className="h-2" />
                     <p className="text-xs font-medium mt-1">{val as number}%</p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {latest.suspiciousRegions && latest.suspiciousRegions.length > 0 && (
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Suspicious Regions</p>
+                <div className="flex flex-wrap gap-2">
+                  {latest.suspiciousRegions.map((r, i) => (
+                    <span key={i} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${r.severity === "high" ? "bg-destructive/15 border-destructive/40 text-destructive" : r.severity === "medium" ? "bg-warning/15 border-warning/40 text-warning" : "bg-muted/40 border-border/50 text-foreground"}`}>
+                      {r.area} <span className="opacity-60 capitalize ml-1">{r.severity}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {latest.frameFlags && latest.frameFlags.length > 0 && (
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Frame Flags</p>
+                <div className="flex flex-wrap gap-2">
+                  {latest.frameFlags.map((f, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-full border border-border/50 bg-muted/30 text-xs">{f}</span>
+                  ))}
+                </div>
               </div>
             )}
 
