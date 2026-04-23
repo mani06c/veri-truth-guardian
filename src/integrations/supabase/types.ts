@@ -41,6 +41,48 @@ export type Database = {
         }
         Relationships: []
       }
+      scans: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          details: Json | null
+          effects: Json | null
+          file_path: string | null
+          id: string
+          input_label: string | null
+          scan_type: string
+          source_type: string | null
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          details?: Json | null
+          effects?: Json | null
+          file_path?: string | null
+          id?: string
+          input_label?: string | null
+          scan_type: string
+          source_type?: string | null
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          details?: Json | null
+          effects?: Json | null
+          file_path?: string | null
+          id?: string
+          input_label?: string | null
+          scan_type?: string
+          source_type?: string | null
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
