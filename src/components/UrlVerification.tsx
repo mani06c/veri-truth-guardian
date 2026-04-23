@@ -4,23 +4,31 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Globe } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Globe, Lock, Clock, Bug } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { AnalysisProgress } from "./AnalysisProgress";
+import { motion, AnimatePresence } from "framer-motion";
 
+interface RiskFlag { flag: string; severity: "low" | "medium" | "high" | "critical" }
 interface UrlResult {
   isCredible: boolean;
   confidence: number;
   category: "credible" | "questionable" | "misinformation";
   analysis: string;
-  credibilityScores?: {
-    sourceCredibility: number;
-    factVerification: number;
-    domainReputation: number;
-    citationQuality: number;
-  };
+  credibilityScores?: { sourceCredibility: number; factVerification: number; domainReputation: number; citationQuality: number };
+  securityScores?: { phishingRisk: number; malwareSuspicion: number; sslTrust: number; domainAgeTrust: number };
+  domainInfo?: { age: string; registrar: string; sslValid: boolean | null; sslIssuer: string };
+  safeBrowsingThreats?: string[];
+  riskFlags?: RiskFlag[];
 }
+
+const FLAG_CLS: Record<string, string> = {
+  low: "bg-muted/40 border-border/50 text-foreground",
+  medium: "bg-warning/15 border-warning/40 text-warning",
+  high: "bg-destructive/15 border-destructive/40 text-destructive",
+  critical: "bg-destructive/25 border-destructive/60 text-destructive font-bold",
+};
 
 export const UrlVerification = () => {
   const [url, setUrl] = useState("");
@@ -30,96 +38,37 @@ export const UrlVerification = () => {
   const { user } = useAuth();
   const { saveScan } = useScans();
 
-  const analyzeUrl = async () => {
-    if (!url.trim()) {
-      toast.error("Please enter a URL to analyze");
-      return;
-    }
-
-    // Basic URL validation
-    try {
-      new URL(url);
-    } catch {
-      toast.error("Please enter a valid URL");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setShowProgress(true);
-    setResult(null);
+  const analyzeUrl = () => {
+    if (!url.trim()) { toast.error("Please enter a URL to analyze"); return; }
+    try { new URL(url); } catch { toast.error("Please enter a valid URL"); return; }
+    setIsAnalyzing(true); setShowProgress(true); setResult(null);
   };
 
   const handleAnalysisComplete = async () => {
     setShowProgress(false);
-    
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      
-      const { data, error } = await supabase.functions.invoke('verify-url', {
-        body: { url }
-      });
-
+      const { data, error } = await supabase.functions.invoke("verify-url", { body: { url } });
       if (error) throw error;
-
-      setResult({
-        isCredible: data.isCredible,
-        confidence: data.confidence,
-        category: data.category,
-        analysis: data.analysis,
-      });
-
+      setResult(data as UrlResult);
       if (user) {
         saveScan.mutate({
-          scan_type: "url",
-          input_label: url,
-          file_path: null,
-          verdict: data.category,
-          confidence: data.confidence,
-          source_type: null,
-          details: data,
-          effects: [],
+          scan_type: "url", input_label: url, file_path: null,
+          verdict: data.category, confidence: data.confidence, source_type: null, details: data, effects: [],
         });
       }
       toast.success("Analysis complete!");
-    } catch (error) {
-      console.error('Analysis error:', error);
+    } catch (err) {
+      console.error("Analysis error:", err);
       toast.error("Analysis failed. Please try again.");
-      setResult({
-        isCredible: false,
-        confidence: 0,
-        category: "misinformation",
-        analysis: "An error occurred during analysis. Please try again.",
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
+      setResult({ isCredible: false, confidence: 0, category: "misinformation", analysis: "An error occurred." });
+    } finally { setIsAnalyzing(false); }
   };
 
-  const getResultIcon = (category: string) => {
-    switch (category) {
-      case "credible":
-        return <ShieldCheck className="w-8 h-8 text-success" />;
-      case "questionable":
-        return <AlertTriangle className="w-8 h-8 text-warning" />;
-      case "misinformation":
-        return <ShieldAlert className="w-8 h-8 text-destructive" />;
-    }
-  };
+  const icon = (cat: string) => cat === "credible" ? <ShieldCheck className="w-6 h-6 text-success" /> : cat === "questionable" ? <AlertTriangle className="w-6 h-6 text-warning" /> : <ShieldAlert className="w-6 h-6 text-destructive" />;
+  const catCls = (cat: string) => cat === "credible" ? "bg-success/10" : cat === "questionable" ? "bg-warning/10" : "bg-destructive/10";
 
-  const getResultColor = (category: string) => {
-    switch (category) {
-      case "credible":
-        return { bg: "bg-success/10", border: "border-success/30" };
-      case "questionable":
-        return { bg: "bg-warning/10", border: "border-warning/30" };
-      case "misinformation":
-        return { bg: "bg-destructive/10", border: "border-destructive/30" };
-    }
-  };
-
-  if (showProgress) {
-    return <AnalysisProgress onComplete={handleAnalysisComplete} />;
-  }
+  if (showProgress) return <AnalysisProgress onComplete={handleAnalysisComplete} />;
 
   return (
     <div className="space-y-6">
@@ -127,89 +76,130 @@ export const UrlVerification = () => {
         <div className="space-y-4">
           <div className="relative">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              type="url"
-              placeholder="https://example.com/article"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="pl-10 glass-panel"
-            />
+            <Input type="url" placeholder="https://example.com/article" value={url} onChange={(e) => setUrl(e.target.value)} className="pl-10 glass-panel" />
           </div>
-          <Button 
-            onClick={analyzeUrl} 
-            disabled={isAnalyzing} 
-            className="w-full bg-gradient-primary animate-lift" 
-            size="lg"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              "Verify URL"
-            )}
+          <Button onClick={analyzeUrl} disabled={isAnalyzing} className="w-full bg-gradient-primary animate-lift" size="lg">
+            {isAnalyzing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing…</> : "Verify URL"}
           </Button>
         </div>
       </Card>
 
-      {result && (
-        <Card className="glass-panel p-6 animate-glass-ripple">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-full glass-glow ${getResultColor(result.category).bg}`}>
-                {getResultIcon(result.category)}
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold capitalize">{result.category}</h3>
-                <p className="text-sm text-muted-foreground">Confidence: {result.confidence}%</p>
-              </div>
-            </div>
+      <AnimatePresence>
+        {result && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+            {/* Verdict */}
+            <Card className="glass-panel p-6 animate-glass-ripple">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-full glass-glow ${catCls(result.category)}`}>{icon(result.category)}</div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold capitalize">{result.category}</h3>
+                    <p className="text-sm text-muted-foreground">Confidence: {result.confidence}%</p>
+                  </div>
+                  <Progress value={result.confidence} className="h-3 w-1/3 glass-panel" />
+                </div>
+                <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">{result.analysis}</p>
 
-            <Progress value={result.confidence} className="h-3 glass-panel" />
-
-            <div className="pt-4 border-t border-border/50">
-              <p className={`text-sm ${result.category === 'misinformation' ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                {result.analysis}
-              </p>
-              
-              {!result.isCredible && (
-                <div className="mt-4 space-y-2">
+                {!result.isCredible && (
                   <div className="p-4 glass-panel rounded-lg border-2 border-destructive glass-glow">
                     <p className="text-destructive font-bold text-lg">⚠ MISINFORMATION SOURCE</p>
-                    <p className="text-sm text-muted-foreground mt-2">This website shows multiple credibility issues</p>
+                    <p className="text-sm text-muted-foreground mt-1">This website shows multiple credibility issues</p>
                   </div>
-                  
-                  {result.credibilityScores && (
-                    <div className="grid grid-cols-2 gap-2 mt-4">
-                      <div className="p-3 glass-panel rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-2">Source Credibility</p>
-                        <Progress value={result.credibilityScores.sourceCredibility} className="h-2" />
-                        <p className="text-xs font-medium mt-1">{result.credibilityScores.sourceCredibility}%</p>
-                      </div>
-                      <div className="p-3 glass-panel rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-2">Fact Verification</p>
-                        <Progress value={result.credibilityScores.factVerification} className="h-2" />
-                        <p className="text-xs font-medium mt-1">{result.credibilityScores.factVerification}%</p>
-                      </div>
-                      <div className="p-3 glass-panel rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-2">Domain Reputation</p>
-                        <Progress value={result.credibilityScores.domainReputation} className="h-2" />
-                        <p className="text-xs font-medium mt-1">{result.credibilityScores.domainReputation}%</p>
-                      </div>
-                      <div className="p-3 glass-panel rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-2">Citation Quality</p>
-                        <Progress value={result.credibilityScores.citationQuality} className="h-2" />
-                        <p className="text-xs font-medium mt-1">{result.credibilityScores.citationQuality}%</p>
-                      </div>
+                )}
+
+                {/* Safe Browsing threats */}
+                {result.safeBrowsingThreats && result.safeBrowsingThreats.length > 0 && (
+                  <div className="p-4 glass-panel rounded-lg border-2 border-destructive/80 bg-destructive/10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Bug className="h-4 w-4 text-destructive" />
+                      <p className="text-sm font-bold text-destructive">Google Safe Browsing Alert</p>
                     </div>
-                  )}
+                    <p className="text-xs text-muted-foreground">Threats detected: {result.safeBrowsingThreats.join(", ")}</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Domain info */}
+            {result.domainInfo && (
+              <Card className="glass-panel p-5">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Domain Intelligence</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <DomainItem icon={<Clock className="h-3 w-3" />} label="Domain Age" value={result.domainInfo.age} />
+                  <DomainItem icon={<Globe className="h-3 w-3" />} label="Registrar" value={result.domainInfo.registrar} />
+                  <DomainItem icon={<Lock className="h-3 w-3" />} label="SSL Valid" value={result.domainInfo.sslValid === true ? "✅ Yes" : result.domainInfo.sslValid === false ? "❌ No" : "Unknown"} />
+                  <DomainItem icon={<Lock className="h-3 w-3" />} label="SSL Issuer" value={result.domainInfo.sslIssuer} />
                 </div>
-              )}
-            </div>
-          </div>
-        </Card>
-      )}
+              </Card>
+            )}
+
+            {/* Credibility scores */}
+            {result.credibilityScores && (
+              <Card className="glass-panel p-5">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Credibility Scores</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["Source Credibility", result.credibilityScores.sourceCredibility],
+                    ["Fact Verification", result.credibilityScores.factVerification],
+                    ["Domain Reputation", result.credibilityScores.domainReputation],
+                    ["Citation Quality", result.credibilityScores.citationQuality],
+                  ] as const).map(([label, val]) => (
+                    <div key={label} className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">{label}</p>
+                      <Progress value={val} className="h-2" />
+                      <p className="text-xs font-medium mt-1">{val}%</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Security scores */}
+            {result.securityScores && (
+              <Card className="glass-panel p-5">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Security Scores</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["Phishing Risk", result.securityScores.phishingRisk],
+                    ["Malware Suspicion", result.securityScores.malwareSuspicion],
+                    ["SSL Trust", result.securityScores.sslTrust],
+                    ["Domain Age Trust", result.securityScores.domainAgeTrust],
+                  ] as const).map(([label, val]) => (
+                    <div key={label} className="p-3 glass-panel rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">{label}</p>
+                      <Progress value={val} className="h-2" />
+                      <p className="text-xs font-medium mt-1">{val}%</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Risk flags */}
+            {result.riskFlags && result.riskFlags.length > 0 && (
+              <Card className="glass-panel p-5">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Risk Flags</p>
+                <div className="flex flex-wrap gap-2">
+                  {result.riskFlags.map((rf, i) => (
+                    <span key={i} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${FLAG_CLS[rf.severity]}`}>
+                      {rf.flag} <span className="opacity-60 capitalize ml-1">{rf.severity}</span>
+                    </span>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+function DomainItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="p-2 rounded-lg glass-panel">
+      <div className="flex items-center gap-1 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">{icon}{label}</div>
+      <p className="font-medium truncate">{value}</p>
+    </div>
+  );
+}
