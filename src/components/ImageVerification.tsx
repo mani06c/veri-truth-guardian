@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useScans } from "@/hooks/useScans";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Sparkles } from "lucide-react";
@@ -46,6 +48,8 @@ export const ImageVerification = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ImageResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const { saveScan } = useScans();
 
   const runAnalysis = async (imageData: string) => {
     setIsAnalyzing(true);
@@ -57,6 +61,18 @@ export const ImageVerification = () => {
       if (error) throw error;
       if (data?.error && !data.category) throw new Error(data.error);
       setResult(data as ImageResult);
+      if (user) {
+        saveScan.mutate({
+          scan_type: "image",
+          input_label: "Image scan",
+          file_path: null,
+          verdict: data.verdict || data.category,
+          confidence: data.confidence,
+          source_type: data.sourceType || null,
+          details: data,
+          effects: data.effects || [],
+        });
+      }
       toast.success("Analysis complete");
     } catch (err) {
       console.error("Analysis error:", err);
