@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useScans } from "@/hooks/useScans";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -25,6 +27,8 @@ export const UrlVerification = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [result, setResult] = useState<UrlResult | null>(null);
+  const { user } = useAuth();
+  const { saveScan } = useScans();
 
   const analyzeUrl = async () => {
     if (!url.trim()) {
@@ -64,6 +68,18 @@ export const UrlVerification = () => {
         analysis: data.analysis,
       });
 
+      if (user) {
+        saveScan.mutate({
+          scan_type: "url",
+          input_label: url,
+          file_path: null,
+          verdict: data.category,
+          confidence: data.confidence,
+          source_type: null,
+          details: data,
+          effects: [],
+        });
+      }
       toast.success("Analysis complete!");
     } catch (error) {
       console.error('Analysis error:', error);

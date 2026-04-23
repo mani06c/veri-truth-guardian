@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useScans } from "@/hooks/useScans";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -19,6 +21,8 @@ export const TextVerification = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const { user } = useAuth();
+  const { saveScan } = useScans();
 
   const analyzeText = async () => {
     if (!text.trim()) {
@@ -50,6 +54,18 @@ export const TextVerification = () => {
         analysis: data.analysis,
       });
 
+      if (user) {
+        saveScan.mutate({
+          scan_type: "text",
+          input_label: text.slice(0, 80),
+          file_path: null,
+          verdict: data.category,
+          confidence: data.confidence,
+          source_type: null,
+          details: data,
+          effects: [],
+        });
+      }
       toast.success("Analysis complete!");
     } catch (error) {
       console.error('Analysis error:', error);
