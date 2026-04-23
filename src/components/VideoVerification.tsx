@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useScans } from "@/hooks/useScans";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Play, Pause } from "lucide-react";
@@ -28,6 +30,8 @@ export const VideoVerification = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [autoScan, setAutoScan] = useState(true);
   const [latest, setLatest] = useState<FrameResult | null>(null);
+  const { user } = useAuth();
+  const { saveScan } = useScans();
   const [history, setHistory] = useState<FrameResult[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,6 +71,18 @@ export const VideoVerification = () => {
       const r: FrameResult = { ...data, timestamp: data.timestamp ?? cap.t };
       setLatest(r);
       setHistory((h) => [r, ...h].slice(0, 8));
+      if (user) {
+        saveScan.mutate({
+          scan_type: "video",
+          input_label: `Video frame @${Math.round(r.timestamp)}s`,
+          file_path: null,
+          verdict: r.verdict || r.category,
+          confidence: r.confidence,
+          source_type: null,
+          details: r,
+          effects: [],
+        });
+      }
     } catch (err) {
       console.error("Frame analysis error:", err);
       toast.error(err instanceof Error ? err.message : "Frame analysis failed");
