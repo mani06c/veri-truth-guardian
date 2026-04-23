@@ -73,7 +73,7 @@ const REGION_BORDER: Record<string, string> = {
 /* ── EXIF extractor ────────────────────────── */
 async function extractExif(file: File): Promise<ExifInfo> {
   try {
-    const raw = await exifr.parse(file, { gps: true, ifd0: true, exif: true });
+    const raw = await exifr.parse(file, true);
     if (!raw) return {};
     return {
       make: raw.Make,
