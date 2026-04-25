@@ -3,12 +3,13 @@ import { useScans } from "@/hooks/useScans";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Sparkles, Camera, Info } from "lucide-react";
+import { Upload, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Sparkles, Camera, Info, Activity, Waves, Grid3x3 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import exifr from "exifr";
+import { analyzeImageForensics, type ForensicBundle } from "@/lib/forensicSignals";
 
 /* ── Types ─────────────────────────────────── */
 interface DetectedEffect {
@@ -31,6 +32,13 @@ interface ImageResult {
   sourceType?: "camera" | "lightly-edited" | "heavily-edited" | "ai-generated";
   analysis: string;
   detectionScores?: { aiGeneration: number; splicing: number; lighting: number; metadata: number };
+  forensicSummary?: {
+    spectralVerdict?: "natural" | "suspicious" | "synthetic";
+    noiseVerdict?: "natural" | "suspicious" | "synthetic";
+    patchVerdict?: "consistent" | "inconsistent";
+    ensembleVerdict?: "real" | "uncertain" | "ai-or-manipulated";
+    fusedConfidence?: number;
+  };
   effects?: DetectedEffect[];
   regions?: Region[];
 }
@@ -109,6 +117,7 @@ export const ImageVerification = () => {
   const [result, setResult] = useState<ImageResult | null>(null);
   const [exifData, setExifData] = useState<ExifInfo | null>(null);
   const [compression, setCompression] = useState<CompressionInfo | null>(null);
+  const [forensics, setForensics] = useState<ForensicBundle | null>(null);
   const [showRegions, setShowRegions] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -117,12 +126,15 @@ export const ImageVerification = () => {
 
   const runAnalysis = async (
     imageData: string,
-    signals?: { exif?: ExifInfo; compression?: CompressionInfo; dimensions?: { width: number; height: number }; mime?: string }
+    signals?: { exif?: ExifInfo; compression?: CompressionInfo; dimensions?: { width: number; height: number }; mime?: string },
+    forensicBundle?: ForensicBundle | null
   ) => {
     setIsAnalyzing(true);
     setResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("verify-image", { body: { imageData, signals } });
+      const { data, error } = await supabase.functions.invoke("verify-image", {
+        body: { imageData, signals, forensics: forensicBundle ?? undefined },
+      });
       if (error) throw error;
       if (data?.error && !data.category) throw new Error(data.error);
       setResult(data as ImageResult);
@@ -134,7 +146,7 @@ export const ImageVerification = () => {
           verdict: data.verdict || data.category,
           confidence: data.confidence,
           source_type: data.sourceType || null,
-          details: data,
+          details: { ...data, forensics: forensicBundle ?? null },
           effects: data.effects || [],
         });
       }
@@ -172,7 +184,11 @@ export const ImageVerification = () => {
 
       const exif = await exifPromise;
       setExifData(exif);
-      runAnalysis(dataUrl, { exif, compression: comp, dimensions: dims, mime: file.type });
+
+      // Run multi-layered forensic ensemble (FFT, noise residual, edges, patches)
+      const forensicBundle = await analyzeImageForensics(dataUrl);
+      setForensics(forensicBundle);
+      runAnalysis(dataUrl, { exif, compression: comp, dimensions: dims, mime: file.type }, forensicBundle);
     };
     reader.readAsDataURL(file);
   }, [user]);
@@ -246,10 +262,10 @@ export const ImageVerification = () => {
                       {showRegions ? "Hide regions" : "Show regions"}
                     </Button>
                   )}
-                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setExifData(null); setCompression(null); }}>
+                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setExifData(null); setCompression(null); setForensics(null); }}>
                     Remove
                   </Button>
-                  <Button className="bg-gradient-primary" disabled={isAnalyzing} onClick={(e) => { e.stopPropagation(); if (selectedImage) runAnalysis(selectedImage); }}>
+                  <Button className="bg-gradient-primary" disabled={isAnalyzing} onClick={(e) => { e.stopPropagation(); if (selectedImage) runAnalysis(selectedImage, undefined, forensics); }}>
                     {isAnalyzing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Re-scanning</> : <><Sparkles className="mr-2 h-4 w-4" />Re-scan</>}
                   </Button>
                 </div>
@@ -303,6 +319,73 @@ export const ImageVerification = () => {
             </Card>
           </motion.div>
         ) : null}
+      </AnimatePresence>
+
+      {/* ── Forensic Ensemble Panel ─────────── */}
+      <AnimatePresence>
+        {forensics && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+            <Card className="glass-panel p-5 animate-glass-fade">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    Multi-layered Forensic Ensemble
+                  </h3>
+                </div>
+                <div className={`px-3 py-1 rounded-full border text-xs font-bold ${
+                  forensics.ensembleScore >= 65 ? "bg-destructive/15 border-destructive/40 text-destructive" :
+                  forensics.ensembleScore >= 35 ? "bg-warning/15 border-warning/40 text-warning" :
+                  "bg-success/15 border-success/40 text-success"
+                }`}>
+                  Ensemble: {forensics.ensembleScore}/100
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ForensicLayer
+                  icon={<Waves className="h-4 w-4" />}
+                  title="Spectral (FFT)"
+                  score={forensics.spectral.syntheticScore}
+                  details={[
+                    ["High-freq ratio", forensics.spectral.highFreqRatio.toFixed(3)],
+                    ["Spectral slope", forensics.spectral.spectralSlope.toFixed(2)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Sparkles className="h-4 w-4" />}
+                  title="Sensor Noise (PRNU)"
+                  score={forensics.noise.cleanlinessScore}
+                  details={[
+                    ["Noise mean", forensics.noise.noiseMean.toFixed(2)],
+                    ["Noise std", forensics.noise.noiseStd.toFixed(2)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Activity className="h-4 w-4" />}
+                  title="Edge Consistency"
+                  score={forensics.edges.softnessScore}
+                  details={[
+                    ["Edge density", forensics.edges.edgeDensity.toFixed(1)],
+                    ["Edge std", forensics.edges.edgeStd.toFixed(1)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Grid3x3 className="h-4 w-4" />}
+                  title="Patch-based Local"
+                  score={forensics.patch.manipulationScore}
+                  details={[
+                    ["Variance-of-var", forensics.patch.varianceOfVariance.toFixed(0)],
+                    ["Noise inconsist.", forensics.patch.noiseInconsistency.toFixed(2)],
+                  ]}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                Spatial CNN signals + Fast Fourier spectrum + sensor-noise residual + 8×8 patch consistency are fused into the ensemble score above and sent to the AI model for the final verdict.
+              </p>
+            </Card>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ── AI Result Panel ──────────────────── */}
@@ -381,6 +464,38 @@ function MetaItem({ label, value }: { label: string; value: string }) {
     <div className="p-2 rounded-lg glass-panel">
       <p className="text-muted-foreground text-[10px] uppercase tracking-wider">{label}</p>
       <p className="font-medium truncate">{value}</p>
+    </div>
+  );
+}
+
+/* ── Forensic layer card ───────────────────── */
+function ForensicLayer({
+  icon, title, score, details,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  score: number;
+  details: [string, string][];
+}) {
+  const tone = score >= 60 ? "text-destructive" : score >= 30 ? "text-warning" : "text-success";
+  return (
+    <div className="p-3 glass-panel rounded-lg border border-border/40">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <span className={tone}>{icon}</span>
+          {title}
+        </div>
+        <span className={`text-xs font-bold ${tone}`}>{score}/100</span>
+      </div>
+      <Progress value={score} className="h-1.5 mb-2" />
+      <div className="grid grid-cols-2 gap-2 text-[10px]">
+        {details.map(([k, v]) => (
+          <div key={k} className="flex justify-between">
+            <span className="text-muted-foreground">{k}</span>
+            <span className="font-medium">{v}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

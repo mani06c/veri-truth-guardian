@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageData, signals } = await req.json();
+    const { imageData, signals, forensics } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     if (!LOVABLE_API_KEY) {
@@ -25,10 +25,12 @@ serve(async (req) => {
       );
     }
 
-    console.log('Analyzing image for AI generation / manipulation / edits...', signals ? 'with client signals' : '');
+    console.log('Analyzing image for AI generation / manipulation / edits...',
+      signals ? 'with metadata signals' : '',
+      forensics ? `+ forensic ensemble pre-score=${forensics.ensembleScore}` : '');
 
     // Build a forensic signals block the model can fuse with visual evidence.
-    const signalsBlock = signals ? `\n\nCLIENT FORENSIC SIGNALS (use as strong corroborating evidence — missing EXIF + small file size + non-camera dimensions are STRONG indicators of AI generation or screenshots):
+    const signalsBlock = signals ? `\n\nCLIENT METADATA & COMPRESSION SIGNALS (use as strong corroborating evidence — missing EXIF + small file size + non-camera dimensions are STRONG indicators of AI generation or screenshots):
 - EXIF camera make: ${signals.exif?.make ?? 'MISSING'}
 - EXIF camera model: ${signals.exif?.model ?? 'MISSING'}
 - EXIF software tag: ${signals.exif?.software ?? 'MISSING'}
@@ -49,6 +51,38 @@ RULES OF THUMB (apply strictly):
 3. EXIF software contains "Photoshop", "Lightroom", "GIMP", "Affinity", "Snapseed", "Facetune" => "heavily-edited" or "lightly-edited" depending on visual evidence.
 4. Real camera photo: present Make+Model+DateTimeOriginal AND natural EXIF metadata => likely authentic UNLESS visual evidence of deepfake/splicing.
 5. PNG with no EXIF and AI-typical dimensions => strong AI signal.` : '';
+
+    const forensicsBlock = forensics ? `\n\nNUMERICAL FORENSIC SIGNALS (computed client-side via CNN-style spatial + FFT spectral + sensor-noise residual + patch-based local analysis. Treat these as HIGH-WEIGHT evidence):
+
+SPECTRAL (Fast Fourier domain, radial energy):
+- High-frequency energy ratio: ${forensics.spectral.highFreqRatio} (real photos 0.18–0.45; AI/diffusion typically <0.15)
+- Mid-frequency energy ratio: ${forensics.spectral.midFreqRatio}
+- Spectral slope (log-log): ${forensics.spectral.spectralSlope} (real photos ≈ -1.8 to -2.2; AI often steeper than -2.4)
+- Spectral synthetic score: ${forensics.spectral.syntheticScore}/100
+
+SENSOR NOISE / PRNU residual (high-pass):
+- Mean residual magnitude: ${forensics.noise.noiseMean} (real cameras 1.5–6.0; AI <1.5)
+- Residual std: ${forensics.noise.noiseStd} (real cameras 2–8; AI <2)
+- Cleanliness score: ${forensics.noise.cleanlinessScore}/100  (higher = unnaturally clean → AI)
+
+EDGE / SOFTNESS (Sobel magnitudes):
+- Mean edge density: ${forensics.edges.edgeDensity}
+- Edge std: ${forensics.edges.edgeStd}
+- Softness score: ${forensics.edges.softnessScore}/100
+
+PATCH-BASED LOCAL CONSISTENCY (8x8 grid):
+- Variance-of-variance across patches: ${forensics.patch.varianceOfVariance}
+- Noise-std inconsistency across patches: ${forensics.patch.noiseInconsistency} (>1.5 strongly suggests splicing/inpainting)
+- Manipulation score: ${forensics.patch.manipulationScore}/100
+
+CLIENT ENSEMBLE PRE-SCORE: ${forensics.ensembleScore}/100 (higher = more synthetic/manipulated)
+
+ENSEMBLE FUSION RULES (apply strictly — these numerical signals override visual impression when they strongly agree):
+- ensembleScore >= 65 AND noise.cleanlinessScore >= 60 => verdict = "AI-Generated", isAuthentic=false, confidence >= 88.
+- patch.manipulationScore >= 60 AND noise.noiseInconsistency markers => verdict = "Manipulated", isAuthentic=false.
+- spectral.syntheticScore >= 50 AND noise.cleanlinessScore >= 50 => bias strongly toward AI-generated even if image looks photoreal.
+- ALL forensic scores low (<25) AND EXIF present AND no visual tells => "Real" / authentic.
+- Mirror these scores into detectionScores.aiGeneration (use max of model judgment and forensics.spectral.syntheticScore + noise.cleanlinessScore averaged).` : '';
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -79,7 +113,7 @@ Examine the image carefully for AI-generation tells (apply ALL of these — mode
 - Manipulation: cloned regions, mismatched noise, soft edges around objects, inconsistent shadows or perspective
 - Edits & effects: Instagram-style filter, vignette, heavy color grading, beauty/skin smoothing, teeth whitening, eye enlargement, slimming/reshaping, background blur or replacement, sky replacement, object removal, HDR boost, oversharpening, noise reduction, exposure/contrast/saturation push, black-and-white conversion, film grain added
 
-Be DECISIVE. Bias toward "AI-Generated" when multiple AI tells co-occur OR when the client signals strongly indicate AI (missing EXIF + AI-typical dimensions). Photorealistic AI images should NOT be marked authentic just because they look real — look for the subtle tells above. Distinguish: unedited camera photo / lightly edited photo / heavily edited photo / fully AI-generated.${signalsBlock}
+Be DECISIVE. Bias toward "AI-Generated" when multiple AI tells co-occur OR when the client signals strongly indicate AI (missing EXIF + AI-typical dimensions OR numerical forensic ensemble score >= 60). Photorealistic AI images should NOT be marked authentic just because they look real — look for the subtle tells above and TRUST the numerical FFT + sensor-noise + patch signals when they agree. Distinguish: unedited camera photo / lightly edited photo / heavily edited photo / fully AI-generated.${signalsBlock}${forensicsBlock}
 
 Return ONLY a valid JSON object, no prose, no markdown fences:
 {
@@ -94,6 +128,13 @@ Return ONLY a valid JSON object, no prose, no markdown fences:
     "splicing": number,
     "lighting": number,
     "metadata": number
+  },
+  "forensicSummary": {
+    "spectralVerdict": "natural" | "suspicious" | "synthetic",
+    "noiseVerdict": "natural" | "suspicious" | "synthetic",
+    "patchVerdict": "consistent" | "inconsistent",
+    "ensembleVerdict": "real" | "uncertain" | "ai-or-manipulated",
+    "fusedConfidence": number
   },
   "effects": [
     { "name": "short label e.g. Beauty filter", "confidence": number, "severity": "subtle" | "moderate" | "strong" }
@@ -114,7 +155,7 @@ regions is an array of suspicious areas. x,y,w,h are normalized 0-1 fractions of
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Analyze this image. Is it real, AI-generated, or manipulated?' },
+              { type: 'text', text: 'Analyze this image with the multi-layered forensic approach. Fuse the numerical FFT, sensor-noise, edge, and patch signals with what you see. Be decisive.' },
               { type: 'image_url', image_url: { url: imageData } }
             ]
           }
