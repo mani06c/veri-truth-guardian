@@ -115,11 +115,14 @@ export const ImageVerification = () => {
   const { user } = useAuth();
   const { saveScan } = useScans();
 
-  const runAnalysis = async (imageData: string) => {
+  const runAnalysis = async (
+    imageData: string,
+    signals?: { exif?: ExifInfo; compression?: CompressionInfo; dimensions?: { width: number; height: number }; mime?: string }
+  ) => {
     setIsAnalyzing(true);
     setResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("verify-image", { body: { imageData } });
+      const { data, error } = await supabase.functions.invoke("verify-image", { body: { imageData, signals } });
       if (error) throw error;
       if (data?.error && !data.category) throw new Error(data.error);
       setResult(data as ImageResult);
@@ -157,16 +160,19 @@ export const ImageVerification = () => {
       const dataUrl = ev.target?.result as string;
       setSelectedImage(dataUrl);
 
-      // Get natural dimensions for compression analysis
-      const img = new Image();
-      img.onload = () => {
-        setCompression(analyzeCompression(file, img.naturalWidth, img.naturalHeight));
-      };
-      img.src = dataUrl;
+      // Get natural dimensions for compression analysis (await so we can fuse signals server-side)
+      const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => resolve({ width: 0, height: 0 });
+        img.src = dataUrl;
+      });
+      const comp = analyzeCompression(file, dims.width, dims.height);
+      setCompression(comp);
 
       const exif = await exifPromise;
       setExifData(exif);
-      runAnalysis(dataUrl);
+      runAnalysis(dataUrl, { exif, compression: comp, dimensions: dims, mime: file.type });
     };
     reader.readAsDataURL(file);
   }, [user]);

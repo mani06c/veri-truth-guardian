@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageData } = await req.json();
+    const { imageData, signals } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     if (!LOVABLE_API_KEY) {
@@ -25,7 +25,30 @@ serve(async (req) => {
       );
     }
 
-    console.log('Analyzing image for AI generation / manipulation / edits...');
+    console.log('Analyzing image for AI generation / manipulation / edits...', signals ? 'with client signals' : '');
+
+    // Build a forensic signals block the model can fuse with visual evidence.
+    const signalsBlock = signals ? `\n\nCLIENT FORENSIC SIGNALS (use as strong corroborating evidence — missing EXIF + small file size + non-camera dimensions are STRONG indicators of AI generation or screenshots):
+- EXIF camera make: ${signals.exif?.make ?? 'MISSING'}
+- EXIF camera model: ${signals.exif?.model ?? 'MISSING'}
+- EXIF software tag: ${signals.exif?.software ?? 'MISSING'}
+- EXIF date taken: ${signals.exif?.dateTime ?? 'MISSING'}
+- EXIF GPS: ${signals.exif?.gps ? 'present' : 'MISSING'}
+- EXIF ISO: ${signals.exif?.iso ?? 'MISSING'}
+- EXIF focal length: ${signals.exif?.focalLength ?? 'MISSING'}
+- File size: ${signals.compression?.fileSize ?? 'unknown'} bytes
+- Megapixels: ${signals.compression?.megapixels?.toFixed?.(2) ?? 'unknown'}
+- Bytes-per-pixel: ${signals.compression?.bytesPerPixel?.toFixed?.(3) ?? 'unknown'}
+- Width x Height: ${signals.dimensions?.width ?? '?'} x ${signals.dimensions?.height ?? '?'}
+- Aspect ratio: ${signals.dimensions?.width && signals.dimensions?.height ? (signals.dimensions.width / signals.dimensions.height).toFixed(3) : 'unknown'}
+- Mime type: ${signals.mime ?? 'unknown'}
+
+RULES OF THUMB (apply strictly):
+1. ALL EXIF camera fields missing AND square / 1:1 aspect (or common AI sizes 512, 768, 1024, 1280, 1536, 1792, 2048) => very likely AI-generated. Set verdict to "AI-Generated", isAuthentic=false, confidence>=85, sourceType="ai-generated".
+2. EXIF software tag mentions "Midjourney", "Stable Diffusion", "DALL", "Imagen", "Flux", "ComfyUI", "Automatic1111", "Adobe Firefly" => certain AI. confidence>=95.
+3. EXIF software contains "Photoshop", "Lightroom", "GIMP", "Affinity", "Snapseed", "Facetune" => "heavily-edited" or "lightly-edited" depending on visual evidence.
+4. Real camera photo: present Make+Model+DateTimeOriginal AND natural EXIF metadata => likely authentic UNLESS visual evidence of deepfake/splicing.
+5. PNG with no EXIF and AI-typical dimensions => strong AI signal.` : '';
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -34,19 +57,29 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           {
             role: 'system',
-            content: `You are a forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects (filters, retouching, color grading, background replacement, beauty filters, HDR, sharpening). You also identify suspicious REGIONS in the image.
+            content: `You are an elite forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen, Gemini Imagen, Adobe Firefly), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects. You ALSO fuse client-side forensic signals (EXIF, compression, dimensions) with visual evidence to reach a decisive verdict. You identify suspicious REGIONS in the image.
 
-Examine the image carefully for:
-- AI generation: over-smooth skin, perfect symmetry, melting/blurred fingers and teeth, illegible text, repeating patterns, plastic textures, unnatural eye reflections
+Examine the image carefully for AI-generation tells (apply ALL of these — modern diffusion models are very photorealistic so be vigilant):
+- Skin: airbrushed/plastic, no real pores, uniform tone, waxy highlights
+- Eyes: irises slightly mismatched, pupils non-round, catchlight inconsistent between eyes, eyelash patterns too symmetric
+- Hair: strands fuse together, edges blur into background, flyaway hairs missing or repeating
+- Hands & teeth: extra/missing fingers, fused knuckles, melted/blended teeth, asymmetric finger lengths
+- Jewellery / accessories: asymmetric earrings, watch faces with garbled numerals, broken chain links
+- Text: illegible, warped, melted, fake-looking letterforms — a near-certain AI tell
+- Background: repeating textures, cloned patterns, geometry that doesn't converge, melted lines, impossible reflections
+- Lighting: subject and background lit from different directions; shadows soft/missing or pointing wrong way
+- Symmetry: face/objects too perfectly symmetric; bilateral details (collars, buttons) mismatched
+- Micro-noise: photographic sensor noise absent; uniformly clean noise pattern across high & low frequency areas (AI hallmark)
+- Frequency artifacts: smooth blobs in detail areas, posterized gradients, "diffusion blur" in flat regions
 - Deepfake: face/neck blending mismatch, lighting direction mismatch, asymmetric earrings, inconsistent ear shape, blurry hair edges
 - Manipulation: cloned regions, mismatched noise, soft edges around objects, inconsistent shadows or perspective
-- Edits & effects: Instagram-style filter, vignette, heavy color grading, beauty/skin smoothing filter, teeth whitening, eye enlargement, slimming/reshaping, background blur or replacement, sky replacement, object removal, HDR boost, oversharpening, noise reduction, exposure/contrast/saturation push, black-and-white conversion, film grain added
+- Edits & effects: Instagram-style filter, vignette, heavy color grading, beauty/skin smoothing, teeth whitening, eye enlargement, slimming/reshaping, background blur or replacement, sky replacement, object removal, HDR boost, oversharpening, noise reduction, exposure/contrast/saturation push, black-and-white conversion, film grain added
 
-Be decisive. Distinguish between an unedited camera photo, a lightly edited photo, a heavily edited photo, and a fully AI-generated image.
+Be DECISIVE. Bias toward "AI-Generated" when multiple AI tells co-occur OR when the client signals strongly indicate AI (missing EXIF + AI-typical dimensions). Photorealistic AI images should NOT be marked authentic just because they look real — look for the subtle tells above. Distinguish: unedited camera photo / lightly edited photo / heavily edited photo / fully AI-generated.${signalsBlock}
 
 Return ONLY a valid JSON object, no prose, no markdown fences:
 {
@@ -75,7 +108,7 @@ Return ONLY a valid JSON object, no prose, no markdown fences:
 }
 
 isAuthentic = true ONLY for an unedited or lightly edited real photo. Mark false if AI-generated, deepfaked, or heavily manipulated.
-confidence = how sure you are of the verdict (0-100). detectionScores are 0-100 where higher = more suspicious. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.
+confidence = how sure you are of the verdict (0-100); use >=85 when client signals corroborate visual evidence. detectionScores are 0-100 where higher = more suspicious. For AI-generated images, aiGeneration MUST be >=80. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.
 regions is an array of suspicious areas. x,y,w,h are normalized 0-1 fractions of image dimensions (top-left origin). Only include regions where manipulation or AI artifacts are visible. For authentic images return an empty array.`
           },
           {
