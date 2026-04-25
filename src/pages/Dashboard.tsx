@@ -3,11 +3,13 @@ import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScans, type Scan } from "@/hooks/useScans";
-import { ShieldCheck, Sparkles, History, Image, FileText, Video, Globe, AlertTriangle, Loader2 } from "lucide-react";
+import { ShieldCheck, Sparkles, History, Image, FileText, Video, Globe, AlertTriangle, Loader2, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { generateForensicReport } from "@/lib/forensicReport";
+import { toast } from "sonner";
 import {
   RadarChart,
   PolarGrid,
@@ -190,6 +192,23 @@ const Dashboard = () => {
                         <p className="text-xs text-muted-foreground">{scan.confidence}%</p>
                       )}
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        try {
+                          generateForensicReport(scan);
+                          toast.success("Forensic report downloaded");
+                        } catch (e) {
+                          console.error(e);
+                          toast.error("Failed to generate report");
+                        }
+                      }}
+                      aria-label="Download forensic PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
                 </motion.div>
               ))}
