@@ -467,3 +467,35 @@ function MetaItem({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/* ── Forensic layer card ───────────────────── */
+function ForensicLayer({
+  icon, title, score, details,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  score: number;
+  details: [string, string][];
+}) {
+  const tone = score >= 60 ? "text-destructive" : score >= 30 ? "text-warning" : "text-success";
+  return (
+    <div className="p-3 glass-panel rounded-lg border border-border/40">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <span className={tone}>{icon}</span>
+          {title}
+        </div>
+        <span className={`text-xs font-bold ${tone}`}>{score}/100</span>
+      </div>
+      <Progress value={score} className="h-1.5 mb-2" />
+      <div className="grid grid-cols-2 gap-2 text-[10px]">
+        {details.map(([k, v]) => (
+          <div key={k} className="flex justify-between">
+            <span className="text-muted-foreground">{k}</span>
+            <span className="font-medium">{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
