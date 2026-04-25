@@ -262,7 +262,7 @@ export const ImageVerification = () => {
                       {showRegions ? "Hide regions" : "Show regions"}
                     </Button>
                   )}
-                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setExifData(null); setCompression(null); }}>
+                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setExifData(null); setCompression(null); setForensics(null); }}>
                     Remove
                   </Button>
                   <Button className="bg-gradient-primary" disabled={isAnalyzing} onClick={(e) => { e.stopPropagation(); if (selectedImage) runAnalysis(selectedImage, undefined, forensics); }}>
