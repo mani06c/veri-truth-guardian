@@ -321,6 +321,73 @@ export const ImageVerification = () => {
         ) : null}
       </AnimatePresence>
 
+      {/* ── Forensic Ensemble Panel ─────────── */}
+      <AnimatePresence>
+        {forensics && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+            <Card className="glass-panel p-5 animate-glass-fade">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    Multi-layered Forensic Ensemble
+                  </h3>
+                </div>
+                <div className={`px-3 py-1 rounded-full border text-xs font-bold ${
+                  forensics.ensembleScore >= 65 ? "bg-destructive/15 border-destructive/40 text-destructive" :
+                  forensics.ensembleScore >= 35 ? "bg-warning/15 border-warning/40 text-warning" :
+                  "bg-success/15 border-success/40 text-success"
+                }`}>
+                  Ensemble: {forensics.ensembleScore}/100
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ForensicLayer
+                  icon={<Waves className="h-4 w-4" />}
+                  title="Spectral (FFT)"
+                  score={forensics.spectral.syntheticScore}
+                  details={[
+                    ["High-freq ratio", forensics.spectral.highFreqRatio.toFixed(3)],
+                    ["Spectral slope", forensics.spectral.spectralSlope.toFixed(2)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Sparkles className="h-4 w-4" />}
+                  title="Sensor Noise (PRNU)"
+                  score={forensics.noise.cleanlinessScore}
+                  details={[
+                    ["Noise mean", forensics.noise.noiseMean.toFixed(2)],
+                    ["Noise std", forensics.noise.noiseStd.toFixed(2)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Activity className="h-4 w-4" />}
+                  title="Edge Consistency"
+                  score={forensics.edges.softnessScore}
+                  details={[
+                    ["Edge density", forensics.edges.edgeDensity.toFixed(1)],
+                    ["Edge std", forensics.edges.edgeStd.toFixed(1)],
+                  ]}
+                />
+                <ForensicLayer
+                  icon={<Grid3x3 className="h-4 w-4" />}
+                  title="Patch-based Local"
+                  score={forensics.patch.manipulationScore}
+                  details={[
+                    ["Variance-of-var", forensics.patch.varianceOfVariance.toFixed(0)],
+                    ["Noise inconsist.", forensics.patch.noiseInconsistency.toFixed(2)],
+                  ]}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                Spatial CNN signals + Fast Fourier spectrum + sensor-noise residual + 8×8 patch consistency are fused into the ensemble score above and sent to the AI model for the final verdict.
+              </p>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── AI Result Panel ──────────────────── */}
       <AnimatePresence>
         {result && (
