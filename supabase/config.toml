@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.verify-url]
 verify_jwt = false
+
+[functions.truth-chat]
+verify_jwt = false
