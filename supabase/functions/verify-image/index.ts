@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Analyzing image for AI generation / manipulation / edits...',
+    console.log('Analyzing image for AI generation / manipulation / edits (premium mode)…',
       signals ? 'with metadata signals' : '',
       forensics ? `+ forensic ensemble pre-score=${forensics.ensembleScore}` : '');
 
@@ -95,7 +95,7 @@ ENSEMBLE FUSION RULES (apply strictly — these numerical signals override visua
         messages: [
           {
             role: 'system',
-            content: `You are an elite forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen, Gemini Imagen, Adobe Firefly), (b) deepfakes / face swaps, (c) digital manipulation (splicing, inpainting, object removal), and (d) photo edits & effects. You ALSO fuse client-side forensic signals (EXIF, compression, dimensions) with visual evidence to reach a decisive verdict. You identify suspicious REGIONS in the image.
+            content: `You are an elite forensic image analyst specialized in detecting (a) AI-generated images (Midjourney, DALL-E, Stable Diffusion, Flux, Imagen, Gemini Imagen, Adobe Firefly, Sora-image), (b) deepfakes / face swaps / face edits, (c) digital manipulation (splicing, inpainting, object removal, background replacement), and (d) photo edits & effects (beauty filters, sky swap, lighting fixes). You fuse client-side forensic signals (EXIF, compression, dimensions, FFT, sensor noise, patches) with what you see to reach a CONFIDENT, decisive verdict. You speak to ordinary people in plain English while being technically rigorous.
 
 Examine the image carefully for AI-generation tells (apply ALL of these — modern diffusion models are very photorealistic so be vigilant):
 - Skin: airbrushed/plastic, no real pores, uniform tone, waxy highlights
@@ -150,7 +150,18 @@ Return ONLY a valid JSON object, no prose, no markdown fences:
 
 isAuthentic = true ONLY for an unedited or lightly edited real photo. Mark false if AI-generated, deepfaked, or heavily manipulated.
 confidence = how sure you are of the verdict (0-100); use >=85 when client signals corroborate visual evidence. detectionScores are 0-100 where higher = more suspicious. For AI-generated images, aiGeneration MUST be >=80. effects is an array (can be empty) of detected edits/effects, each with confidence 0-100.
-regions is an array of suspicious areas. x,y,w,h are normalized 0-1 fractions of image dimensions (top-left origin). Only include regions where manipulation or AI artifacts are visible. For authentic images return an empty array.`
+regions is an array of suspicious areas. x,y,w,h are normalized 0-1 fractions of image dimensions (top-left origin). Only include regions where manipulation or AI artifacts are visible. For authentic images return an empty array.
+
+ALSO RETURN these PREMIUM fields (additive — keep them in the same JSON object):
+- "primaryMetric": { "label": "AI Generated Probability" | "Manipulation Probability" | "Authenticity Score", "value": number 0-100 }
+  Pick "AI Generated Probability" when the dominant signal is synthetic generation; "Manipulation Probability" for splicing/inpainting/face-edits/background-swap/heavy retouching; "Authenticity Score" only for clearly real photos (and value = 100 - max risk).
+- "verdictTag": one of "Original Photo" | "Lightly Edited" | "Edited" | "Heavily Manipulated" | "Deepfake Suspected" | "AI Generated"
+- "trustScore": { "level": "Low Risk" | "Medium Risk" | "High Risk", "score": number 0-100 (lower = safer) }
+- "plainExplanation": one short, friendly paragraph (2-3 sentences, no jargon) any non-technical person can understand. Talk like a calm expert ("The skin looks too smooth and the background repeats — this is a strong sign of an AI image.").
+- "whyItMatters": 2-3 bullet points (strings) describing real-world impact in plain language, picked from: dating-app catfishing, romance scams, fake job offers / hiring fraud, fake screenshots, news misinformation, political propaganda, identity theft, harassment, fake product reviews, fraudulent insurance claims. Pick the bullets most relevant to THIS image's verdict.
+- "detectionBreakdown": object with these keys (each 0-100, higher = stronger evidence of that issue): { "deepfake": number, "beautyFilter": number, "faceEdit": number, "backgroundReplacement": number, "objectRemoval": number, "lightingMismatch": number, "metadataIssues": number, "aiPattern": number }. Be generous when signals are present — don't return all zeros for a suspicious image.
+
+TONE for plainExplanation & whyItMatters: warm, human, calm, non-robotic. No "As an AI…". No headings. Use everyday words.`
           },
           {
             role: 'user',
