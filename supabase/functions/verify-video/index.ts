@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface AudioSignals {
+  durationSec?: number;
+  sampleRate?: number;
+  rmsMean?: number;        // overall loudness 0-1
+  rmsStd?: number;         // dynamic variation
+  zcrMean?: number;        // zero-crossing rate (proxy for noisiness)
+  spectralFlatnessMean?: number; // 0 (tonal) … 1 (noisy)
+  spectralCentroidMean?: number; // Hz – brightness
+  silentRatio?: number;    // % of frames near silence
+  voicedRatio?: number;    // % of frames with voiced energy
+  noiseFloorDb?: number;   // background noise floor
+  pitchStability?: number; // 0-1 (1 = robotic/flat, low = natural variation)
+}
+
+interface FrameInput {
+  timestamp: number;
+  dataUrl: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -12,21 +31,93 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    // Accept a single frame (data URL) for real-time scan
-    const frame: string | undefined = body.frame;
-    const timestamp: number | undefined = body.timestamp;
+    // Modes:
+    // 1) Legacy single-frame: { frame, timestamp }
+    // 2) Premium multi-frame: { frames: [{timestamp, dataUrl}], audio: AudioSignals, durationSec }
+    const legacyFrame: string | undefined = body.frame;
+    const legacyTimestamp: number | undefined = body.timestamp;
+    const frames: FrameInput[] | undefined = Array.isArray(body.frames) ? body.frames : undefined;
+    const audio: AudioSignals | undefined = body.audio;
+    const durationSec: number | undefined = body.durationSec;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
-    if (!frame) {
+    if (!legacyFrame && (!frames || frames.length === 0)) {
       return new Response(
-        JSON.stringify({ error: 'frame (data URL) is required' }),
+        JSON.stringify({ error: 'frames[] or frame is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Analyzing video frame at t=${timestamp ?? 0}s`);
+    // Build the payload
+    const useFrames: FrameInput[] = frames && frames.length
+      ? frames
+      : [{ timestamp: legacyTimestamp ?? 0, dataUrl: legacyFrame as string }];
+
+    console.log(`Analyzing video — frames=${useFrames.length}, hasAudio=${!!audio}, duration=${durationSec ?? 'n/a'}s`);
+
+    const systemPrompt = `You are a senior forensic video analyst for a premium consumer trust product.
+You receive multiple sampled frames from one video plus client-side audio signals.
+Detect: AI generation (Sora/Runway/Pika/Veo/Kling), face-swap deepfakes, lip-sync mismatch, unnatural blinking,
+voice cloning, suspicious frame cuts, replay/loop edits, lighting/background mismatch across frames,
+unnatural facial expressions, morphing limbs/objects, plastic skin, melted hair, hand/finger errors.
+
+Use the provided audio signals when judging voice authenticity:
+- Very high pitchStability (>0.85) + low rmsStd (<0.05) + flatness < 0.3 ⇒ likely synthetic / TTS / voice-cloned.
+- Very clean noiseFloorDb (< -55 dB) with no ambient variation ⇒ studio-clean, possibly synthetic.
+- voicedRatio > 0.6 with abnormally constant centroid ⇒ robotic.
+- Natural recordings have rmsStd > 0.08, varying centroid and some noise floor variation.
+
+Fuse signals across frames AND audio into ONE confident verdict. Be decisive — do not hedge.
+
+Return ONLY valid JSON, no markdown, matching this schema exactly:
+{
+  "isAuthentic": boolean,
+  "confidence": number,                       // 0-100, certainty of the verdict
+  "category": "authentic" | "suspicious" | "deepfake",
+  "verdict": "Original" | "Edited" | "Manipulated" | "AI-Generated" | "Deepfake Suspected",
+  "verdictTag": "Original" | "Edited" | "Manipulated" | "AI-Generated" | "Deepfake Suspected",
+  "trustScore": { "level": "Low Risk" | "Medium Risk" | "High Risk", "score": number },
+  "primaryMetric": { "label": string, "value": number },   // e.g. "Deepfake Probability" 89
+  "plainExplanation": "2-3 short human-friendly sentences, no jargon",
+  "analysis": "1-2 sentence forensic summary citing concrete evidence",
+  "whyItMatters": [ "real-world risk bullet 1", "bullet 2", "bullet 3" ],
+  "detectionScores": {
+    "facialManipulation": number,             // 0-100, higher = more suspicious
+    "lipSync": number,
+    "temporalConsistency": number,
+    "ganArtifacts": number,
+    "blinkRate": number,
+    "lightingMismatch": number,
+    "backgroundConsistency": number,
+    "voiceAuthenticity": number               // 0-100, higher = more suspicious voice
+  },
+  "voice": {
+    "score": number,                          // 0-100, AUTHENTICITY (higher = more authentic)
+    "verdict": "Real" | "Possibly AI-generated" | "Suspicious",
+    "summary": "1 short sentence on the voice"
+  },
+  "timeline": [
+    { "timestamp": number, "type": "visual" | "audio" | "both",
+      "severity": "low" | "medium" | "high",
+      "label": "short label e.g. lip-sync drift",
+      "note": "1 short sentence" }
+  ],
+  "frameFlags": ["short labels for each issue across frames"]
+}`;
+
+    const userContent: any[] = [
+      {
+        type: 'text',
+        text: `Analyze this video. Frames sampled at: ${useFrames.map(f => `${f.timestamp.toFixed(1)}s`).join(', ')}.${durationSec ? ` Duration ${durationSec.toFixed(1)}s.` : ''}
+
+Audio signals: ${audio ? JSON.stringify(audio) : 'not provided'}
+
+Return the JSON described in the system prompt. Pick a primaryMetric label that fits the verdict ("Deepfake Probability", "Manipulation Probability", "AI Generated Probability", or "Authenticity Score").`
+      },
+      ...useFrames.map(f => ({ type: 'image_url', image_url: { url: f.dataUrl } })),
+    ];
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -35,49 +126,10 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
-          {
-            role: 'system',
-            content: `You are a forensic video analyst inspecting a single frame from a video to detect AI generation (Sora, Runway, Pika, Veo, Kling) and deepfakes (face swap, lip-sync manipulation, full-body puppetry, voice cloning).
-
-Look for:
-- Face boundary blending, mismatched skin tone at jawline, flickering edges
-- Eye and teeth artifacts, asymmetric facial details
-- Lip-shape mismatch with expected speech, unnatural mouth interior
-- AI video signatures: morphing backgrounds, warping objects, hands with wrong finger counts, melting hair, plastic skin, unnatural lighting on face vs body
-- GAN/diffusion fingerprints: micro repeating textures, smoothed details
-- Voice authenticity cues visible in the frame: lip/jaw sync with expected speech, facial muscle engagement during speech
-
-Be decisive. Return ONLY valid JSON, no markdown:
-{
-  "isAuthentic": boolean,
-  "confidence": number,
-  "category": "authentic" | "suspicious" | "deepfake",
-  "verdict": "Real" | "AI-Generated" | "Deepfake" | "Suspicious",
-  "analysis": "2-4 sentence forensic explanation citing specific visual evidence in the frame",
-  "detectionScores": {
-    "facialManipulation": number,
-    "lipSync": number,
-    "temporalConsistency": number,
-    "ganArtifacts": number,
-    "voiceAuthenticity": number
-  },
-  "suspiciousRegions": [
-    { "area": "short label e.g. jawline blend", "severity": "low" | "medium" | "high" }
-  ],
-  "frameFlags": ["list of specific issues found in this frame"]
-}
-
-Scores 0-100, higher = more suspicious. suspiciousRegions lists areas where anomalies are visible. frameFlags are short string labels for each issue detected.`
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: `Analyze this video frame${timestamp != null ? ` (t=${timestamp.toFixed(1)}s)` : ''}. Is it real, AI-generated, or a deepfake?` },
-              { type: 'image_url', image_url: { url: frame } }
-            ]
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent }
         ],
       }),
     });
@@ -105,7 +157,7 @@ Scores 0-100, higher = more suspicious. suspiciousRegions lists areas where anom
     const jsonMatch = resultText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Failed to parse AI response');
     const result = JSON.parse(jsonMatch[0]);
-    if (timestamp != null) result.timestamp = timestamp;
+    if (legacyTimestamp != null && result.timestamp == null) result.timestamp = legacyTimestamp;
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
