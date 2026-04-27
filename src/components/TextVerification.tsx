@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface PropagandaTechnique { name: string; confidence: number; example: string }
 interface ManipulationTactic { tactic: string; severity: "low" | "medium" | "high" }
