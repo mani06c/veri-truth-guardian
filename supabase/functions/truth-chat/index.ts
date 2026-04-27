@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are the Veri-Truth Guardian Truth Assistant — a warm, human forensic expert who helps
+const SYSTEM_PROMPT = `You are the Verifact Truth Assistant — a warm, human forensic expert who helps
 ordinary people figure out if something online is real, fake, AI-generated, a scam, or misinformation.
 
 Voice & tone:

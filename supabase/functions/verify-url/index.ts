@@ -8,7 +8,7 @@ const corsHeaders = {
 /* ── helpers ───────────────────────────────── */
 async function fetchPageContent(url: string): Promise<string> {
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VeriTruthBot/1.0)' } });
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VerifactBot/1.0)' } });
     if (!r.ok) return 'Unable to fetch page content';
     const html = await r.text();
     return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 6000);
@@ -41,7 +41,7 @@ async function checkGoogleSafeBrowsing(url: string, apiKey: string): Promise<{ t
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        client: { clientId: 'veritruth', clientVersion: '1.0' },
+        client: { clientId: 'verifact', clientVersion: '1.0' },
         threatInfo: {
           threatTypes: ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
           platformTypes: ['ANY_PLATFORM'],

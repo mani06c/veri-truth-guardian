@@ -128,7 +128,7 @@ const Auth = () => {
               </div>
             </div>
             <div className="leading-tight">
-              <div className="font-bold text-xl tracking-tight">Veri-Truth Guardian</div>
+              <div className="font-bold text-xl tracking-tight">Verifact</div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Forensic AI · Real or Fake
               </div>
@@ -245,7 +245,7 @@ const Auth = () => {
 
           <p className="text-center text-xs text-muted-foreground mt-6">
             By continuing you agree to use this platform responsibly. <br />
-            Veri-Truth detection is assistive — always verify with multiple sources.
+            Verifact detection is assistive — always verify with multiple sources.
           </p>
         </motion.div>
       </div>
