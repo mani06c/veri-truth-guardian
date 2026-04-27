@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Brain, MessageCircleWarning } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Brain, MessageCircleWarning, History, FileSearch, GitCompare } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { AnalysisProgress } from "./AnalysisProgress";
@@ -12,10 +12,13 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface PropagandaTechnique { name: string; confidence: number; example: string }
 interface ManipulationTactic { tactic: string; severity: "low" | "medium" | "high" }
+interface FactCheck { claim: string; status: "supported" | "unverified" | "contradicted"; note?: string }
 interface TextResult {
   isAuthentic: boolean;
   confidence: number;
   category: "authentic" | "suspicious" | "fake";
+  verdict?: "Real" | "Misleading" | "Fake";
+  probabilities?: { real: number; misleading: number; fake: number };
   analysis: string;
   indicators?: string[];
   scores?: {
@@ -25,6 +28,10 @@ interface TextResult {
   biasDirection?: string;
   propagandaTechniques?: PropagandaTechnique[];
   manipulationTactics?: ManipulationTactic[];
+  factChecks?: FactCheck[];
+  historicalContext?: string;
+  inconsistencies?: string[];
+  layerSignals?: { semantic: number; factCheck: number; historical: number; consistency: number; propaganda: number; sourceCredibility: number };
   aiExplanation?: string;
 }
 
@@ -78,6 +85,15 @@ export const TextVerification = () => {
 
   // Derive a clear top-line verdict tag: Real / AI-Generated / Fake News / Manipulated / Suspicious
   const deriveTag = (r: TextResult): { tag: string; metricLabel: string; metricValue: number; cls: string } => {
+    // If the backend ensemble produced explicit Real/Misleading/Fake probabilities, trust them.
+    if (r.probabilities && r.verdict) {
+      const p = r.probabilities;
+      if (r.verdict === "Real")
+        return { tag: "REAL NEWS", metricLabel: "Real Probability", metricValue: p.real, cls: "bg-success/15 border-success/50 text-success" };
+      if (r.verdict === "Misleading")
+        return { tag: "MISLEADING", metricLabel: "Misleading Probability", metricValue: p.misleading, cls: "bg-warning/15 border-warning/50 text-warning" };
+      return { tag: "FAKE NEWS", metricLabel: "Fake Probability", metricValue: p.fake, cls: "bg-destructive/15 border-destructive/50 text-destructive" };
+    }
     const s = r.scores;
     const ai = s?.aiGeneratedProbability ?? 0;
     const fake = s?.fakeNewsProbability ?? 0;
@@ -128,6 +144,29 @@ export const TextVerification = () => {
                 </Card>
               );
             })()}
+
+            {/* Real / Misleading / Fake probability breakdown */}
+            {result.probabilities && (
+              <Card className="glass-panel p-5 animate-glass-ripple">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Probability Breakdown</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    ["Real", result.probabilities.real, "success"],
+                    ["Misleading", result.probabilities.misleading, "warning"],
+                    ["Fake", result.probabilities.fake, "destructive"],
+                  ] as const).map(([label, val, tone]) => (
+                    <div key={label} className={`p-3 rounded-lg glass-panel border ${tone === "success" ? "border-success/40" : tone === "warning" ? "border-warning/40" : "border-destructive/40"}`}>
+                      <p className={`text-xs font-medium ${tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "text-destructive"}`}>{label}</p>
+                      <p className="text-2xl font-extrabold tabular-nums mt-1">{val}%</p>
+                      <Progress value={val} className="h-1.5 mt-2" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  Final classification chosen by highest probability via ensemble of semantic, fact-check, historical and consistency layers.
+                </p>
+              </Card>
+            )}
 
             {/* Verdict */}
             <Card className="glass-panel p-6 animate-glass-ripple">
@@ -207,6 +246,63 @@ export const TextVerification = () => {
                     <span key={i} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${SEVERITY_CLS[mt.severity]}`}>{mt.tactic}</span>
                   ))}
                 </div>
+              </Card>
+            )}
+
+            {/* Fact checks */}
+            {result.factChecks && result.factChecks.length > 0 && (
+              <Card className="glass-panel p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileSearch className="h-4 w-4 text-primary" />
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Claim Fact-Check</p>
+                </div>
+                <div className="space-y-2">
+                  {result.factChecks.map((fc, i) => {
+                    const cls = fc.status === "supported"
+                      ? "border-success/40 bg-success/10 text-success"
+                      : fc.status === "contradicted"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : "border-warning/40 bg-warning/10 text-warning";
+                    return (
+                      <div key={i} className="p-3 glass-panel rounded-lg">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-medium flex-1">"{fc.claim}"</p>
+                          <span className={`px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider ${cls}`}>{fc.status}</span>
+                        </div>
+                        {fc.note && <p className="text-xs text-muted-foreground">{fc.note}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
+            {/* Historical context */}
+            {result.historicalContext && result.historicalContext.trim() && (
+              <Card className="glass-panel p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <History className="h-4 w-4 text-primary" />
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Historical Context</p>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{result.historicalContext}</p>
+              </Card>
+            )}
+
+            {/* Inconsistencies */}
+            {result.inconsistencies && result.inconsistencies.length > 0 && (
+              <Card className="glass-panel p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <GitCompare className="h-4 w-4 text-warning" />
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Inconsistencies & Unsupported Statements</p>
+                </div>
+                <ul className="space-y-1.5">
+                  {result.inconsistencies.map((item, i) => (
+                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                      <span className="text-warning mt-0.5">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </Card>
             )}
 
