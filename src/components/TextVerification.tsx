@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { AnalysisProgress } from "./AnalysisProgress";
 import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface PropagandaTechnique { name: string; confidence: number; example: string }
 interface ManipulationTactic { tactic: string; severity: "low" | "medium" | "high" }
@@ -168,154 +169,181 @@ export const TextVerification = () => {
               </Card>
             )}
 
-            {/* Verdict */}
-            <Card className="glass-panel p-6 animate-glass-ripple">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-full glass-glow ${catCls(result.category)}`}>{icon(result.category)}</div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold capitalize">{result.category}</h3>
-                    <p className="text-sm text-muted-foreground">Confidence: {result.confidence}%
-                      {result.biasDirection && result.biasDirection !== "unknown" && <> · Bias: <span className={`font-medium capitalize ${BIAS_COLORS[result.biasDirection] || ""}`}>{result.biasDirection}</span></>}
-                    </p>
-                  </div>
-                  <Progress value={result.confidence} className="h-3 w-1/3 glass-panel" />
-                </div>
+            {/* Detailed analysis — one section at a time via tabs */}
+            {(() => {
+              const tabs: { id: string; label: string; show: boolean }[] = [
+                { id: "summary", label: "Summary", show: true },
+                { id: "scores", label: "Threat Scores", show: !!result.scores },
+                { id: "facts", label: "Fact Check", show: !!(result.factChecks && result.factChecks.length) },
+                { id: "history", label: "History", show: !!(result.historicalContext && result.historicalContext.trim()) },
+                { id: "incons", label: "Inconsistencies", show: !!(result.inconsistencies && result.inconsistencies.length) },
+                { id: "propaganda", label: "Propaganda", show: !!(result.propagandaTechniques && result.propagandaTechniques.length) },
+                { id: "tactics", label: "Tactics", show: !!(result.manipulationTactics && result.manipulationTactics.length) },
+                { id: "explain", label: "Explanation", show: !!result.aiExplanation },
+              ].filter(t => t.show);
 
-                <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">{result.analysis}</p>
+              return (
+                <Card className="glass-panel p-4 md:p-5 animate-glass-ripple">
+                  <Tabs defaultValue={tabs[0].id} className="w-full">
+                    <TabsList className="flex flex-wrap gap-1 h-auto bg-transparent p-0 mb-4 border-b border-border/40 rounded-none w-full justify-start">
+                      {tabs.map(t => (
+                        <TabsTrigger
+                          key={t.id}
+                          value={t.id}
+                          className="rounded-md data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-xs md:text-sm"
+                        >
+                          {t.label}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
 
-                {!result.isAuthentic && (
-                  <div className="p-4 glass-panel rounded-lg border-2 border-destructive glass-glow">
-                    <p className="text-destructive font-bold text-lg">⚠ FAKE NEWS DETECTED</p>
-                    <p className="text-sm text-muted-foreground mt-1">This content shows multiple signs of misinformation</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Scores radar */}
-            {result.scores && (
-              <Card className="glass-panel p-5">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Threat Scores</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {([
-                    ["Fake News", result.scores.fakeNewsProbability],
-                    ["Propaganda", result.scores.propagandaLevel],
-                    ["Bias", result.scores.biasScore],
-                    ["Sentiment Manipulation", result.scores.sentimentManipulation],
-                    ["Source Credibility", result.scores.sourceCredibility],
-                    ["AI-Generated", result.scores.aiGeneratedProbability],
-                  ] as const).map(([label, val]) => (
-                    <div key={label} className="p-3 glass-panel rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">{label}</p>
-                      <Progress value={val} className="h-2" />
-                      <p className="text-xs font-medium mt-1">{val}%</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Propaganda techniques */}
-            {result.propagandaTechniques && result.propagandaTechniques.length > 0 && (
-              <Card className="glass-panel p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <MessageCircleWarning className="h-4 w-4 text-warning" />
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Propaganda Techniques</p>
-                </div>
-                <div className="space-y-2">
-                  {result.propagandaTechniques.map((pt, i) => (
-                    <div key={i} className="p-3 glass-panel rounded-lg">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium">{pt.name}</span>
-                        <span className="text-xs text-muted-foreground">{pt.confidence}%</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground italic">"{pt.example}"</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Manipulation tactics */}
-            {result.manipulationTactics && result.manipulationTactics.length > 0 && (
-              <Card className="glass-panel p-5">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Manipulation Tactics</p>
-                <div className="flex flex-wrap gap-2">
-                  {result.manipulationTactics.map((mt, i) => (
-                    <span key={i} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${SEVERITY_CLS[mt.severity]}`}>{mt.tactic}</span>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Fact checks */}
-            {result.factChecks && result.factChecks.length > 0 && (
-              <Card className="glass-panel p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileSearch className="h-4 w-4 text-primary" />
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Claim Fact-Check</p>
-                </div>
-                <div className="space-y-2">
-                  {result.factChecks.map((fc, i) => {
-                    const cls = fc.status === "supported"
-                      ? "border-success/40 bg-success/10 text-success"
-                      : fc.status === "contradicted"
-                      ? "border-destructive/40 bg-destructive/10 text-destructive"
-                      : "border-warning/40 bg-warning/10 text-warning";
-                    return (
-                      <div key={i} className="p-3 glass-panel rounded-lg">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-sm font-medium flex-1">"{fc.claim}"</p>
-                          <span className={`px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider ${cls}`}>{fc.status}</span>
+                    {/* Summary */}
+                    <TabsContent value="summary" className="mt-0 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-full glass-glow ${catCls(result.category)}`}>{icon(result.category)}</div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold capitalize">{result.category}</h3>
+                          <p className="text-sm text-muted-foreground">Confidence: {result.confidence}%
+                            {result.biasDirection && result.biasDirection !== "unknown" && <> · Bias: <span className={`font-medium capitalize ${BIAS_COLORS[result.biasDirection] || ""}`}>{result.biasDirection}</span></>}
+                          </p>
                         </div>
-                        {fc.note && <p className="text-xs text-muted-foreground">{fc.note}</p>}
+                        <Progress value={result.confidence} className="h-3 w-1/3 glass-panel" />
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
+                      <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">{result.analysis}</p>
+                      {!result.isAuthentic && (
+                        <div className="p-4 glass-panel rounded-lg border-2 border-destructive glass-glow">
+                          <p className="text-destructive font-bold text-lg">⚠ FAKE NEWS DETECTED</p>
+                          <p className="text-sm text-muted-foreground mt-1">This content shows multiple signs of misinformation</p>
+                        </div>
+                      )}
+                    </TabsContent>
 
-            {/* Historical context */}
-            {result.historicalContext && result.historicalContext.trim() && (
-              <Card className="glass-panel p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <History className="h-4 w-4 text-primary" />
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Historical Context</p>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{result.historicalContext}</p>
-              </Card>
-            )}
+                    {/* Threat Scores */}
+                    {result.scores && (
+                      <TabsContent value="scores" className="mt-0">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {([
+                            ["Fake News", result.scores.fakeNewsProbability],
+                            ["Propaganda", result.scores.propagandaLevel],
+                            ["Bias", result.scores.biasScore],
+                            ["Sentiment Manipulation", result.scores.sentimentManipulation],
+                            ["Source Credibility", result.scores.sourceCredibility],
+                            ["AI-Generated", result.scores.aiGeneratedProbability],
+                          ] as const).map(([label, val]) => (
+                            <div key={label} className="p-3 glass-panel rounded-lg">
+                              <p className="text-xs text-muted-foreground mb-2">{label}</p>
+                              <Progress value={val} className="h-2" />
+                              <p className="text-xs font-medium mt-1">{val}%</p>
+                            </div>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    )}
 
-            {/* Inconsistencies */}
-            {result.inconsistencies && result.inconsistencies.length > 0 && (
-              <Card className="glass-panel p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <GitCompare className="h-4 w-4 text-warning" />
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Inconsistencies & Unsupported Statements</p>
-                </div>
-                <ul className="space-y-1.5">
-                  {result.inconsistencies.map((item, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                      <span className="text-warning mt-0.5">•</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            )}
+                    {/* Fact Checks */}
+                    {result.factChecks && result.factChecks.length > 0 && (
+                      <TabsContent value="facts" className="mt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FileSearch className="h-4 w-4 text-primary" />
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground">Claim Fact-Check</p>
+                        </div>
+                        <div className="space-y-2">
+                          {result.factChecks.map((fc, i) => {
+                            const cls = fc.status === "supported"
+                              ? "border-success/40 bg-success/10 text-success"
+                              : fc.status === "contradicted"
+                              ? "border-destructive/40 bg-destructive/10 text-destructive"
+                              : "border-warning/40 bg-warning/10 text-warning";
+                            return (
+                              <div key={i} className="p-3 glass-panel rounded-lg">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <p className="text-sm font-medium flex-1">"{fc.claim}"</p>
+                                  <span className={`px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider ${cls}`}>{fc.status}</span>
+                                </div>
+                                {fc.note && <p className="text-xs text-muted-foreground">{fc.note}</p>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TabsContent>
+                    )}
 
-            {/* AI Explanation */}
-            {result.aiExplanation && (
-              <Card className="glass-panel p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Brain className="h-4 w-4 text-primary" />
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">AI Expert Explanation</p>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{result.aiExplanation}</p>
-              </Card>
-            )}
+                    {/* History */}
+                    {result.historicalContext && result.historicalContext.trim() && (
+                      <TabsContent value="history" className="mt-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <History className="h-4 w-4 text-primary" />
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground">Historical Context</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{result.historicalContext}</p>
+                      </TabsContent>
+                    )}
+
+                    {/* Inconsistencies */}
+                    {result.inconsistencies && result.inconsistencies.length > 0 && (
+                      <TabsContent value="incons" className="mt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <GitCompare className="h-4 w-4 text-warning" />
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground">Inconsistencies & Unsupported Statements</p>
+                        </div>
+                        <ul className="space-y-1.5">
+                          {result.inconsistencies.map((item, i) => (
+                            <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                              <span className="text-warning mt-0.5">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </TabsContent>
+                    )}
+
+                    {/* Propaganda */}
+                    {result.propagandaTechniques && result.propagandaTechniques.length > 0 && (
+                      <TabsContent value="propaganda" className="mt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MessageCircleWarning className="h-4 w-4 text-warning" />
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground">Propaganda Techniques</p>
+                        </div>
+                        <div className="space-y-2">
+                          {result.propagandaTechniques.map((pt, i) => (
+                            <div key={i} className="p-3 glass-panel rounded-lg">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium">{pt.name}</span>
+                                <span className="text-xs text-muted-foreground">{pt.confidence}%</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground italic">"{pt.example}"</p>
+                            </div>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    )}
+
+                    {/* Tactics */}
+                    {result.manipulationTactics && result.manipulationTactics.length > 0 && (
+                      <TabsContent value="tactics" className="mt-0">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Manipulation Tactics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {result.manipulationTactics.map((mt, i) => (
+                            <span key={i} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${SEVERITY_CLS[mt.severity]}`}>{mt.tactic}</span>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    )}
+
+                    {/* AI Explanation */}
+                    {result.aiExplanation && (
+                      <TabsContent value="explain" className="mt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Brain className="h-4 w-4 text-primary" />
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground">AI Expert Explanation</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{result.aiExplanation}</p>
+                      </TabsContent>
+                    )}
+                  </Tabs>
+                </Card>
+              );
+            })()}
           </motion.div>
         )}
       </AnimatePresence>
