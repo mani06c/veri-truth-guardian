@@ -76,6 +76,24 @@ export const TextVerification = () => {
   const icon = (cat: string) => cat === "authentic" ? <ShieldCheck className="w-6 h-6 text-success" /> : cat === "suspicious" ? <AlertTriangle className="w-6 h-6 text-warning" /> : <ShieldAlert className="w-6 h-6 text-destructive" />;
   const catCls = (cat: string) => cat === "authentic" ? "bg-success/10" : cat === "suspicious" ? "bg-warning/10" : "bg-destructive/10";
 
+  // Derive a clear top-line verdict tag: Real / AI-Generated / Fake News / Manipulated / Suspicious
+  const deriveTag = (r: TextResult): { tag: string; metricLabel: string; metricValue: number; cls: string } => {
+    const s = r.scores;
+    const ai = s?.aiGeneratedProbability ?? 0;
+    const fake = s?.fakeNewsProbability ?? 0;
+    const prop = s?.propagandaLevel ?? 0;
+    const manip = Math.max(prop, s?.sentimentManipulation ?? 0);
+    if (r.category === "authentic" && ai < 60 && fake < 40)
+      return { tag: "REAL CONTENT", metricLabel: "Authenticity Score", metricValue: r.confidence, cls: "bg-success/15 border-success/50 text-success" };
+    if (ai >= 70)
+      return { tag: "AI-GENERATED", metricLabel: "AI Generated Probability", metricValue: ai, cls: "bg-primary/15 border-primary/50 text-primary" };
+    if (fake >= 65 || r.category === "fake")
+      return { tag: "FAKE NEWS", metricLabel: "Fake News Probability", metricValue: Math.max(fake, r.confidence), cls: "bg-destructive/15 border-destructive/50 text-destructive" };
+    if (manip >= 60)
+      return { tag: "MANIPULATED", metricLabel: "Manipulation Probability", metricValue: manip, cls: "bg-warning/15 border-warning/50 text-warning" };
+    return { tag: "SUSPICIOUS", metricLabel: "Risk Score", metricValue: r.confidence, cls: "bg-warning/15 border-warning/50 text-warning" };
+  };
+
   if (showProgress) return <AnalysisProgress onComplete={handleAnalysisComplete} />;
 
   return (
@@ -92,6 +110,25 @@ export const TextVerification = () => {
       <AnimatePresence>
         {result && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+            {/* Hero verdict tag */}
+            {(() => {
+              const t = deriveTag(result);
+              return (
+                <Card className={`glass-panel p-6 border-2 ${t.cls} animate-glass-ripple`}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest opacity-70 mb-1">Verdict</p>
+                      <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t.tag}</h2>
+                      <p className="text-xs opacity-70 mt-1">{t.metricLabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl md:text-5xl font-extrabold tabular-nums">{Math.round(t.metricValue)}%</div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
+
             {/* Verdict */}
             <Card className="glass-panel p-6 animate-glass-ripple">
               <div className="space-y-4">
