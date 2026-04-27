@@ -234,10 +234,10 @@ export const ImageVerification = () => {
 
   const handleShare = async () => {
     if (!result) return;
-    const summary = `Veri-Truth result: ${result.verdictTag || result.verdict} · ${result.primaryMetric?.label ?? "Confidence"} ${result.primaryMetric?.value ?? result.confidence}%`;
+    const summary = `Verifact result: ${result.verdictTag || result.verdict} · ${result.primaryMetric?.label ?? "Confidence"} ${result.primaryMetric?.value ?? result.confidence}%`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Veri-Truth scan", text: summary });
+        await navigator.share({ title: "Verifact scan", text: summary });
       } else {
         await navigator.clipboard.writeText(summary);
         toast.success("Summary copied to clipboard");

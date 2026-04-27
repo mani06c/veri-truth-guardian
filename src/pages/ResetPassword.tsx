@@ -48,7 +48,7 @@ const ResetPassword = () => {
           <div className="bg-gradient-primary p-2 rounded-xl">
             <ShieldCheck className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-bold text-lg">Veri-Truth Guardian</span>
+          <span className="font-bold text-lg">Verifact</span>
         </div>
         <Card className="glass-panel p-6">
           <h2 className="text-2xl font-bold mb-1">Set new password</h2>

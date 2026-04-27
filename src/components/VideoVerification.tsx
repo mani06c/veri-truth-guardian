@@ -239,9 +239,9 @@ export const VideoVerification = () => {
   };
   const handleShare = async () => {
     if (!result) return;
-    const summary = `Veri-Truth video result: ${result.verdictTag || result.verdict} · ${result.primaryMetric?.label ?? "Confidence"} ${result.primaryMetric?.value ?? result.confidence}%`;
+    const summary = `Verifact video result: ${result.verdictTag || result.verdict} · ${result.primaryMetric?.label ?? "Confidence"} ${result.primaryMetric?.value ?? result.confidence}%`;
     try {
-      if (navigator.share) await navigator.share({ title: "Veri-Truth scan", text: summary });
+      if (navigator.share) await navigator.share({ title: "Verifact scan", text: summary });
       else { await navigator.clipboard.writeText(summary); toast.success("Summary copied"); }
     } catch { /* user cancelled */ }
   };
