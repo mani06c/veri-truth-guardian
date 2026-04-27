@@ -68,6 +68,22 @@ export const UrlVerification = () => {
   const icon = (cat: string) => cat === "credible" ? <ShieldCheck className="w-6 h-6 text-success" /> : cat === "questionable" ? <AlertTriangle className="w-6 h-6 text-warning" /> : <ShieldAlert className="w-6 h-6 text-destructive" />;
   const catCls = (cat: string) => cat === "credible" ? "bg-success/10" : cat === "questionable" ? "bg-warning/10" : "bg-destructive/10";
 
+  // Derive top-line verdict tag for URLs
+  const deriveTag = (r: UrlResult): { tag: string; metricLabel: string; metricValue: number; cls: string } => {
+    const phishing = r.securityScores?.phishingRisk ?? 0;
+    const malware = r.securityScores?.malwareSuspicion ?? 0;
+    const credibility = r.credibilityScores?.sourceCredibility ?? r.confidence;
+    if (r.safeBrowsingThreats && r.safeBrowsingThreats.length > 0)
+      return { tag: "DANGEROUS / MALICIOUS", metricLabel: "Threat Level", metricValue: Math.max(phishing, malware, 90), cls: "bg-destructive/15 border-destructive/50 text-destructive" };
+    if (phishing >= 65 || malware >= 65)
+      return { tag: "PHISHING / SCAM", metricLabel: "Phishing Risk", metricValue: Math.max(phishing, malware), cls: "bg-destructive/15 border-destructive/50 text-destructive" };
+    if (r.category === "misinformation")
+      return { tag: "FAKE NEWS / MISINFORMATION", metricLabel: "Misinformation Probability", metricValue: r.confidence, cls: "bg-destructive/15 border-destructive/50 text-destructive" };
+    if (r.category === "questionable")
+      return { tag: "SUSPICIOUS SOURCE", metricLabel: "Risk Score", metricValue: r.confidence, cls: "bg-warning/15 border-warning/50 text-warning" };
+    return { tag: "REAL / CREDIBLE", metricLabel: "Credibility Score", metricValue: credibility, cls: "bg-success/15 border-success/50 text-success" };
+  };
+
   if (showProgress) return <AnalysisProgress onComplete={handleAnalysisComplete} />;
 
   return (
@@ -87,6 +103,25 @@ export const UrlVerification = () => {
       <AnimatePresence>
         {result && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+            {/* Hero verdict tag */}
+            {(() => {
+              const t = deriveTag(result);
+              return (
+                <Card className={`glass-panel p-6 border-2 ${t.cls} animate-glass-ripple`}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest opacity-70 mb-1">Verdict</p>
+                      <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t.tag}</h2>
+                      <p className="text-xs opacity-70 mt-1">{t.metricLabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl md:text-5xl font-extrabold tabular-nums">{Math.round(t.metricValue)}%</div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
+
             {/* Verdict */}
             <Card className="glass-panel p-6 animate-glass-ripple">
               <div className="space-y-4">
