@@ -41,9 +41,6 @@ export const AppHeader = () => {
             </div>
             <div className="leading-tight">
               <div className="font-bold text-lg tracking-tight">Verifact</div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground -mt-1">
-                Guardian
-              </div>
             </div>
           </Link>
 
