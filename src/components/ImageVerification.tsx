@@ -372,8 +372,8 @@ export const ImageVerification = () => {
             {/* HERO: big probability + verdict + trust badge */}
             <Card className={`glass-panel p-7 animate-glass-ripple ring-2 ${vstyle.ring} bg-gradient-to-br ${vstyle.gradient} relative overflow-hidden`}>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 relative">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div className="space-y-3 flex flex-col items-center text-center md:items-center md:text-center mx-auto">
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/60 backdrop-blur-md border ${vstyle.text}`}>
                       {vstyle.icon}
                       <span className="font-bold text-sm">{verdictKey}</span>
@@ -387,7 +387,7 @@ export const ImageVerification = () => {
 
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-1">{primary?.label}</p>
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-baseline justify-center gap-2">
                       <motion.span
                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
                         className={`text-6xl md:text-7xl font-extrabold tracking-tight tabular-nums ${vstyle.text}`}
@@ -400,7 +400,7 @@ export const ImageVerification = () => {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex flex-col gap-2 md:items-end">
+                <div className="flex flex-col gap-2 md:items-end md:absolute md:right-0 md:top-0">
                   <Button onClick={handleDownloadReport} className="bg-gradient-primary">
                     <Download className="mr-2 h-4 w-4" /> Download report
                   </Button>
