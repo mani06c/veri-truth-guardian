@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export interface Scan {
   id: string;
   user_id: string;
-  scan_type: "image" | "text" | "video" | "url";
+  scan_type: "image" | "text" | "video" | "url" | "audio";
   input_label: string | null;
   file_path: string | null;
   verdict: string | null;
