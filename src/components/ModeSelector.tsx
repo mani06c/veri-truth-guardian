@@ -1,8 +1,8 @@
-import { FileText, Image, Video, Link2 } from "lucide-react";
+import { FileText, Image, Video, Link2, Mic } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 interface ModeSelectorProps {
-  onSelectMode: (mode: "text" | "image" | "video" | "url") => void;
+  onSelectMode: (mode: "text" | "image" | "video" | "audio" | "url") => void;
 }
 
 export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
@@ -26,6 +26,12 @@ export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
       description: "Identify manipulated video content",
     },
     {
+      id: "audio" as const,
+      icon: Mic,
+      title: "Audio Forensic Analysis",
+      description: "Detect AI voice, voice cloning, edits and tampering",
+    },
+    {
       id: "url" as const,
       icon: Link2,
       title: "URL Fact-Check",
@@ -45,7 +51,7 @@ export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {modes.map((mode, index) => (
             <Card
               key={mode.id}
