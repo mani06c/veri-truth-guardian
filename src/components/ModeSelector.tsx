@@ -1,4 +1,5 @@
-import { FileText, Image, Video, Link2, Mic } from "lucide-react";
+import { FileText, Image, Video, Link2, Mic, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 
 interface ModeSelectorProps {
@@ -70,6 +71,16 @@ export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
               </div>
             </Card>
           ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <Link
+            to="/guides/how-to-detect-deepfakes"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+          >
+            <BookOpen className="h-4 w-4" />
+            New: How to detect deepfakes — a forensic AI analysis guide
+          </Link>
         </div>
       </div>
     </div>
