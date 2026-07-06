@@ -26,6 +26,7 @@ export const ThemeToggle = () => {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
+      aria-label="Toggle theme"
       className="glass-panel animate-lift rounded-full w-12 h-12"
     >
       {theme === "light" ? (
