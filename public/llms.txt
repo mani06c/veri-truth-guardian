@@ -8,3 +8,7 @@ VeriFact combines NLP fact-checking, image and video deepfake detection, audio f
 
 - [Home](/): Run text, image, video, audio or URL verification.
 - [Sign in](/auth): Create an account or sign in.
+
+## Guides
+
+- [How to detect deepfakes](/guides/how-to-detect-deepfakes): Forensic AI walkthrough covering EXIF, lighting, AI artifacts, voice cloning and video temporal glitches.

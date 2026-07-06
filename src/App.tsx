@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
+import DetectDeepfakesGuide from "./pages/DetectDeepfakesGuide";
 import NotFound from "./pages/NotFound";
 import { TruthAssistant } from "@/components/TruthAssistant";
 
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/guides/how-to-detect-deepfakes" element={<DetectDeepfakesGuide />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <TruthAssistant />
