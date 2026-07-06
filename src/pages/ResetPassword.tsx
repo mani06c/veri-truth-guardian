@@ -43,6 +43,11 @@ const ResetPassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4 relative overflow-hidden">
+      <Seo
+        title="Reset password | VeriFact"
+        description="Set a new password for your VeriFact account."
+        path="/reset-password"
+      />
       <div className="absolute top-6 right-6 z-50"><ThemeToggle /></div>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-6">

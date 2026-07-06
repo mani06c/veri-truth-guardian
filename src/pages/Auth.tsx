@@ -106,6 +106,11 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-hero">
+      <Seo
+        title="Sign in | VeriFact"
+        description="Sign in or create a VeriFact account to run forensic AI verification on text, images, video, audio and URLs."
+        path="/auth"
+      />
       {/* Animated background blobs */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 -left-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl animate-pulse" />
