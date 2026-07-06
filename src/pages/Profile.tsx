@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
+import { Seo } from "@/components/Seo";
 
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -39,6 +40,11 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero">
+      <Seo
+        title="Profile | VeriFact"
+        description="Manage your VeriFact account details, display name and avatar."
+        path="/profile"
+      />
       <AppHeader />
       <main className="container mx-auto px-4 py-10 max-w-2xl">
         <h1 className="text-3xl font-bold mb-6">Your profile</h1>

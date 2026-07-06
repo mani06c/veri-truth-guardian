@@ -49,7 +49,7 @@ export const VerificationSection = ({ initialMode = "text" }: VerificationSectio
               <current.icon className="w-5 h-5 text-primary" />
               <span className="font-semibold">{current.label} Analysis</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setMobileOpen((v) => !v)}>
+            <Button variant="ghost" size="icon" aria-label="Toggle analysis modules menu" onClick={() => setMobileOpen((v) => !v)}>
               <Menu className="w-5 h-5" />
             </Button>
           </div>
@@ -74,6 +74,8 @@ export const VerificationSection = ({ initialMode = "text" }: VerificationSectio
                     <button
                       key={item.id}
                       onClick={() => { setActive(item.id); setMobileOpen(false); }}
+                      aria-label={`Open ${item.title}`}
+                      aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all",
                         isActive
