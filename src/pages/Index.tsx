@@ -4,12 +4,18 @@ import { VerificationSection } from "@/components/VerificationSection";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Seo } from "@/components/Seo";
 
 const Index = () => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-hero">
+      <Seo
+        title="VeriFact — AI Fake News & Deepfake Detection"
+        description="Verify text, images, video, audio and URLs with forensic AI. Detect fake news, deepfakes and manipulated media in seconds."
+        path="/"
+      />
       <AppHeader />
       {!selectedMode ? (
         <ModeSelector onSelectMode={setSelectedMode} />

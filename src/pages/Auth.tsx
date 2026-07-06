@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Seo } from "@/components/Seo";
 
 const emailSchema = z.string().trim().email({ message: "Enter a valid email" }).max(255);
 const passwordSchema = z

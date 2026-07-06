@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { generateForensicReport } from "@/lib/forensicReport";
 import { toast } from "sonner";
+import { Seo } from "@/components/Seo";
 import {
   RadarChart,
   PolarGrid,
@@ -95,6 +96,11 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero">
+      <Seo
+        title="Dashboard | VeriFact"
+        description="Your forensic command center — track scans, trust scores and analysis history across text, image, video, audio and URL checks."
+        path="/dashboard"
+      />
       <AppHeader />
       <main className="container mx-auto px-4 py-10 max-w-6xl space-y-8">
         {/* Hero heading */}
