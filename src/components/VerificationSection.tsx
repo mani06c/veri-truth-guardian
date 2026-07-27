@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Image as ImageIcon, Video as VideoIcon, Mic, Link2, Menu } from "lucide-react";
+import { FileText, Image as ImageIcon, Video as VideoIcon, Mic, Link2, Menu, FileCheck2 } from "lucide-react";
 import { TextVerification } from "./TextVerification";
 import { ImageVerification } from "./ImageVerification";
 import { VideoVerification } from "./VideoVerification";
 import { UrlVerification } from "./UrlVerification";
 import { AudioVerification } from "./AudioVerification";
+import { DocumentVerification } from "./DocumentVerification";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Mode = "text" | "image" | "video" | "audio" | "url";
+type Mode = "text" | "image" | "video" | "audio" | "url" | "document";
 
 interface VerificationSectionProps {
   initialMode?: string;
@@ -21,6 +22,7 @@ const NAV: { id: Mode; label: string; icon: any; title: string; subtitle: string
   { id: "video", label: "Video", icon: VideoIcon, title: "Video Deepfake Analysis", subtitle: "Identify deepfake videos and manipulation patterns" },
   { id: "audio", label: "Audio", icon: Mic,       title: "Audio Forensic Analysis",  subtitle: "Detect AI-generated voice, voice cloning, splicing and tampering" },
   { id: "url",   label: "URL",   icon: Link2,    title: "URL Fact-Checking",        subtitle: "Verify website credibility and content authenticity" },
+  { id: "document", label: "Document", icon: FileCheck2, title: "Document Verification", subtitle: "Verify PDFs, DOCX and scanned documents for forgery, tampering & AI generation" },
 ];
 
 export const VerificationSection = ({ initialMode = "text" }: VerificationSectionProps) => {
@@ -36,6 +38,7 @@ export const VerificationSection = ({ initialMode = "text" }: VerificationSectio
       case "video": return <VideoVerification />;
       case "audio": return <AudioVerification />;
       case "url":   return <UrlVerification />;
+      case "document": return <DocumentVerification />;
     }
   };
 
