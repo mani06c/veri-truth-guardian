@@ -1,9 +1,9 @@
-import { FileText, Image, Video, Link2, Mic, BookOpen } from "lucide-react";
+import { FileText, Image, Video, Link2, Mic, BookOpen, FileCheck2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 
 interface ModeSelectorProps {
-  onSelectMode: (mode: "text" | "image" | "video" | "audio" | "url") => void;
+  onSelectMode: (mode: "text" | "image" | "video" | "audio" | "url" | "document") => void;
 }
 
 export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
@@ -37,6 +37,12 @@ export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
       icon: Link2,
       title: "URL Fact-Check",
       description: "Verify website credibility and content",
+    },
+    {
+      id: "document" as const,
+      icon: FileCheck2,
+      title: "Document Verification",
+      description: "Detect forged, tampered or AI-generated PDFs & scans",
     },
   ];
 
