@@ -227,9 +227,11 @@ const Dashboard = () => {
         </Card>
       </main>
       <BackToTop />
+      <BackToModes to="/" />
     </div>
   );
 };
 
 export default Dashboard;
+
 
