@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Brain, MessageCircleWarning, History, FileSearch, GitCompare } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Brain, MessageCircleWarning, History, FileSearch, GitCompare, BadgeCheck, XCircle, HelpCircle, Newspaper, Landmark, Clock, Sparkles, PencilLine } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { AnalysisProgress } from "./AnalysisProgress";
@@ -14,11 +14,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 interface PropagandaTechnique { name: string; confidence: number; example: string }
 interface ManipulationTactic { tactic: string; severity: "low" | "medium" | "high" }
 interface FactCheck { claim: string; status: "supported" | "unverified" | "contradicted"; note?: string }
+interface EventSummary { what?: string; when?: string; where?: string; who?: string; why?: string; latest?: string; context?: string }
+interface Correction { needed?: boolean; inaccurateParts?: string[]; reasons?: string[]; correctedClaim?: string; whatActuallyHappened?: string }
+interface TrustedSource { name: string; type?: string; note?: string }
+type VerifiedVerdict = "Verified" | "False Information" | "Misleading" | "Partially True" | "Insufficient Evidence";
 interface TextResult {
   isAuthentic: boolean;
   confidence: number;
   category: "authentic" | "suspicious" | "fake";
   verdict?: "Real" | "Misleading" | "Fake";
+  verifiedVerdict?: VerifiedVerdict;
   probabilities?: { real: number; misleading: number; fake: number };
   analysis: string;
   indicators?: string[];
@@ -34,6 +39,10 @@ interface TextResult {
   inconsistencies?: string[];
   layerSignals?: { semantic: number; factCheck: number; historical: number; consistency: number; propaganda: number; sourceCredibility: number };
   aiExplanation?: string;
+  eventSummary?: EventSummary;
+  correction?: Correction;
+  trustedSources?: TrustedSource[];
+  verifiedAt?: string;
 }
 
 const SEVERITY_CLS: Record<string, string> = {
@@ -84,6 +93,14 @@ export const TextVerification = () => {
   const icon = (cat: string) => cat === "authentic" ? <ShieldCheck className="w-6 h-6 text-success" /> : cat === "suspicious" ? <AlertTriangle className="w-6 h-6 text-warning" /> : <ShieldAlert className="w-6 h-6 text-destructive" />;
   const catCls = (cat: string) => cat === "authentic" ? "bg-success/10" : cat === "suspicious" ? "bg-warning/10" : "bg-destructive/10";
 
+  const VV_STYLE: Record<VerifiedVerdict, { cls: string; icon: JSX.Element; label: string }> = {
+    "Verified":              { cls: "bg-success/15 border-success/50 text-success",           icon: <BadgeCheck className="w-6 h-6" />,   label: "VERIFIED" },
+    "False Information":     { cls: "bg-destructive/15 border-destructive/50 text-destructive", icon: <XCircle className="w-6 h-6" />,    label: "FALSE INFORMATION" },
+    "Misleading":            { cls: "bg-warning/15 border-warning/50 text-warning",           icon: <AlertTriangle className="w-6 h-6" />, label: "MISLEADING" },
+    "Partially True":        { cls: "bg-warning/15 border-warning/50 text-warning",           icon: <AlertTriangle className="w-6 h-6" />, label: "PARTIALLY TRUE" },
+    "Insufficient Evidence": { cls: "bg-muted/40 border-border/50 text-foreground",           icon: <HelpCircle className="w-6 h-6" />,   label: "INSUFFICIENT EVIDENCE" },
+  };
+
   // Derive a clear top-line verdict tag: Real / AI-Generated / Fake News / Manipulated / Suspicious
   const deriveTag = (r: TextResult): { tag: string; metricLabel: string; metricValue: number; cls: string } => {
     // If the backend ensemble produced explicit Real/Misleading/Fake probabilities, trust them.
@@ -127,14 +144,41 @@ export const TextVerification = () => {
       <AnimatePresence>
         {result && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
-            {/* Hero verdict tag */}
+            {/* Verification hero */}
+            {result.verifiedVerdict && (() => {
+              const s = VV_STYLE[result.verifiedVerdict];
+              return (
+                <Card className={`glass-panel p-6 border-2 ${s.cls} animate-glass-ripple`}>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-background/30">{s.icon}</div>
+                      <div>
+                        <p className="text-xs uppercase tracking-widest opacity-70 mb-1">News Verification</p>
+                        <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">{s.label}</h2>
+                        {result.verifiedAt && (
+                          <p className="text-[11px] opacity-70 mt-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Verified at {new Date(result.verifiedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-widest opacity-70">Confidence</p>
+                      <div className="text-4xl md:text-5xl font-extrabold tabular-nums">{Math.round(result.confidence)}%</div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
+
+            {/* Legacy hero verdict tag (kept for signal detail) */}
             {(() => {
               const t = deriveTag(result);
               return (
                 <Card className={`glass-panel p-6 border-2 ${t.cls} animate-glass-ripple`}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-widest opacity-70 mb-1">Verdict</p>
+                      <p className="text-xs uppercase tracking-widest opacity-70 mb-1">Signal Verdict</p>
                       <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t.tag}</h2>
                       <p className="text-xs opacity-70 mt-1">{t.metricLabel}</p>
                     </div>
@@ -145,6 +189,104 @@ export const TextVerification = () => {
                 </Card>
               );
             })()}
+
+            {/* Correction / What actually happened */}
+            {result.correction?.needed && (
+              <Card className="glass-panel p-5 border-2 border-primary/40 animate-glass-ripple">
+                <div className="flex items-center gap-2 mb-3">
+                  <PencilLine className="w-4 h-4 text-primary" />
+                  <p className="text-xs uppercase tracking-widest text-primary font-semibold">Corrected Information</p>
+                </div>
+                {result.correction.correctedClaim && (
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Corrected claim</p>
+                    <p className="text-sm font-medium leading-relaxed">{result.correction.correctedClaim}</p>
+                  </div>
+                )}
+                {result.correction.whatActuallyHappened && (
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">What actually happened</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{result.correction.whatActuallyHappened}</p>
+                  </div>
+                )}
+                {result.correction.inaccurateParts && result.correction.inaccurateParts.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Inaccurate or fabricated parts</p>
+                    <ul className="space-y-1">
+                      {result.correction.inaccurateParts.map((p, i) => (
+                        <li key={i} className="text-sm text-destructive flex gap-2"><span className="mt-0.5">✗</span><span className="text-foreground/90">{p}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result.correction.reasons && result.correction.reasons.length > 0 && (
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Why they're wrong</p>
+                    <ul className="space-y-1">
+                      {result.correction.reasons.map((p, i) => (
+                        <li key={i} className="text-sm text-muted-foreground flex gap-2"><span className="text-warning mt-0.5">•</span><span>{p}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Event summary */}
+            {result.eventSummary && Object.values(result.eventSummary).some(v => v && String(v).trim()) && (
+              <Card className="glass-panel p-5 animate-glass-ripple">
+                <div className="flex items-center gap-2 mb-3">
+                  <Newspaper className="w-4 h-4 text-primary" />
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Event Summary</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {([
+                    ["What", result.eventSummary.what],
+                    ["When", result.eventSummary.when],
+                    ["Where", result.eventSummary.where],
+                    ["Who", result.eventSummary.who],
+                    ["Why", result.eventSummary.why],
+                    ["Latest", result.eventSummary.latest],
+                  ] as const).map(([label, val]) => (val && String(val).trim()) ? (
+                    <div key={label} className="p-3 glass-panel rounded-lg">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+                      <p className="text-sm">{val}</p>
+                    </div>
+                  ) : null)}
+                </div>
+                {result.eventSummary.context && result.eventSummary.context.trim() && (
+                  <div className="mt-3 p-3 rounded-lg border border-border/50 bg-muted/20">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Context</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{result.eventSummary.context}</p>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Trusted sources referenced */}
+            {result.trustedSources && result.trustedSources.length > 0 && (
+              <Card className="glass-panel p-5 animate-glass-ripple">
+                <div className="flex items-center gap-2 mb-3">
+                  <Landmark className="w-4 h-4 text-primary" />
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Cross-referenced Trusted Sources</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {result.trustedSources.map((s, i) => (
+                    <div key={i} className="px-3 py-2 rounded-lg glass-panel border border-border/50 max-w-full">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-3 h-3 text-primary shrink-0" />
+                        <span className="text-sm font-medium">{s.name}</span>
+                        {s.type && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">· {s.type}</span>}
+                      </div>
+                      {s.note && <p className="text-xs text-muted-foreground mt-1">{s.note}</p>}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  Sources named from the model's trained knowledge of established news agencies, government bodies and fact-checkers. Always confirm with the outlet directly for breaking events.
+                </p>
+              </Card>
+            )}
 
             {/* Real / Misleading / Fake probability breakdown */}
             {result.probabilities && (
