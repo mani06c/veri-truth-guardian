@@ -78,8 +78,10 @@ const Profile = () => {
           </form>
         </Card>
       </main>
+      <BackToTop />
     </div>
   );
 };
 
 export default Profile;
+

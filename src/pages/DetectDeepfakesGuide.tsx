@@ -265,6 +265,7 @@ const DetectDeepfakesGuide = () => {
           </Button>
         </section>
       </main>
+      <BackToTop />
     </div>
   );
 };
