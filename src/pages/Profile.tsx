@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToTop } from "@/components/BackToTop";
 import { Seo } from "@/components/Seo";
+
 
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -76,8 +78,10 @@ const Profile = () => {
           </form>
         </Card>
       </main>
+      <BackToTop />
     </div>
   );
 };
 
 export default Profile;
+

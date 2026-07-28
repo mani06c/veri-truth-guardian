@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToTop } from "@/components/BackToTop";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScans, type Scan } from "@/hooks/useScans";
 import { ShieldCheck, Sparkles, History, Image, FileText, Video, Globe, AlertTriangle, Loader2, Download } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
+
 
 /* ── Circular Progress Ring ──────────────────── */
 function CircularProgress({ value, size = 100, strokeWidth = 8, label, color }: {
@@ -222,8 +224,10 @@ const Dashboard = () => {
           )}
         </Card>
       </main>
+      <BackToTop />
     </div>
   );
 };
 
 export default Dashboard;
+

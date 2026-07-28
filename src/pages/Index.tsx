@@ -2,9 +2,11 @@ import { useState } from "react";
 import { ModeSelector } from "@/components/ModeSelector";
 import { VerificationSection } from "@/components/VerificationSection";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToTop } from "@/components/BackToTop";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Seo } from "@/components/Seo";
+
 
 const Index = () => {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
@@ -34,8 +36,10 @@ const Index = () => {
           <VerificationSection initialMode={selectedMode} />
         </div>
       )}
+      <BackToTop />
     </div>
   );
 };
 
 export default Index;
+

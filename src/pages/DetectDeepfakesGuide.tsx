@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToTop } from "@/components/BackToTop";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Seo } from "@/components/Seo";
@@ -16,6 +17,7 @@ import {
   AlertTriangle,
   ArrowRight,
 } from "lucide-react";
+
 
 const SITE = "https://veri-truth-guardian.lovable.app";
 const PATH = "/guides/how-to-detect-deepfakes";
@@ -263,6 +265,7 @@ const DetectDeepfakesGuide = () => {
           </Button>
         </section>
       </main>
+      <BackToTop />
     </div>
   );
 };
