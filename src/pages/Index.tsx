@@ -36,8 +36,10 @@ const Index = () => {
           <VerificationSection initialMode={selectedMode} />
         </div>
       )}
+      <BackToTop />
     </div>
   );
 };
 
 export default Index;
+
