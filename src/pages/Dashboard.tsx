@@ -2,9 +2,7 @@ import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/AppHeader";
 import { BackToTop } from "@/components/BackToTop";
-import { BackToModes } from "@/components/BackToModes";
 import { useAuth } from "@/contexts/AuthContext";
-
 import { useScans, type Scan } from "@/hooks/useScans";
 import { ShieldCheck, Sparkles, History, Image, FileText, Video, Globe, AlertTriangle, Loader2, Download } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -227,11 +225,9 @@ const Dashboard = () => {
         </Card>
       </main>
       <BackToTop />
-      <BackToModes to="/" />
     </div>
   );
 };
 
 export default Dashboard;
-
 

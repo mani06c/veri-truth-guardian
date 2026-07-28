@@ -3,11 +3,9 @@ import { ModeSelector } from "@/components/ModeSelector";
 import { VerificationSection } from "@/components/VerificationSection";
 import { AppHeader } from "@/components/AppHeader";
 import { BackToTop } from "@/components/BackToTop";
-import { BackToModes } from "@/components/BackToModes";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Seo } from "@/components/Seo";
-
 
 
 const Index = () => {
@@ -39,11 +37,9 @@ const Index = () => {
         </div>
       )}
       <BackToTop />
-      {selectedMode && <BackToModes onClick={() => setSelectedMode(null)} />}
     </div>
   );
 };
 
 export default Index;
-
 
