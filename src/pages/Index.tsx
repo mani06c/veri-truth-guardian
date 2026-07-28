@@ -39,9 +39,11 @@ const Index = () => {
         </div>
       )}
       <BackToTop />
+      {selectedMode && <BackToModes onClick={() => setSelectedMode(null)} />}
     </div>
   );
 };
 
 export default Index;
+
 
