@@ -17,6 +17,9 @@ interface FactCheck { claim: string; status: "supported" | "unverified" | "contr
 interface EventSummary { what?: string; when?: string; where?: string; who?: string; why?: string; latest?: string; context?: string }
 interface Correction { needed?: boolean; inaccurateParts?: string[]; reasons?: string[]; correctedClaim?: string; whatActuallyHappened?: string }
 interface TrustedSource { name: string; type?: string; note?: string }
+interface LiveSource { title: string; url: string; source: string; group: string }
+interface EvidenceItem { title: string; url: string; source?: string; stance?: "supports" | "refutes" | "context"; note?: string }
+interface SourceCoverage { corroboratingOutlets?: number; contradictingOutlets?: number; socialOnly?: boolean; summary?: string }
 type VerifiedVerdict = "Verified" | "False Information" | "Misleading" | "Partially True" | "Insufficient Evidence";
 interface TextResult {
   isAuthentic: boolean;
@@ -42,8 +45,18 @@ interface TextResult {
   eventSummary?: EventSummary;
   correction?: Correction;
   trustedSources?: TrustedSource[];
+  liveSources?: LiveSource[];
+  liveSearchUsed?: boolean;
+  evidenceUsed?: EvidenceItem[];
+  sourceCoverage?: SourceCoverage;
   verifiedAt?: string;
 }
+
+const STANCE_CLS: Record<string, string> = {
+  supports: "text-success border-success/40 bg-success/10",
+  refutes: "text-destructive border-destructive/40 bg-destructive/10",
+  context: "text-muted-foreground border-border/50 bg-muted/20",
+};
 
 const SEVERITY_CLS: Record<string, string> = {
   low: "bg-muted/40 border-border/50 text-foreground",
