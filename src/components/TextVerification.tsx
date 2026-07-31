@@ -17,6 +17,9 @@ interface FactCheck { claim: string; status: "supported" | "unverified" | "contr
 interface EventSummary { what?: string; when?: string; where?: string; who?: string; why?: string; latest?: string; context?: string }
 interface Correction { needed?: boolean; inaccurateParts?: string[]; reasons?: string[]; correctedClaim?: string; whatActuallyHappened?: string }
 interface TrustedSource { name: string; type?: string; note?: string }
+interface LiveSource { title: string; url: string; source: string; group: string }
+interface EvidenceItem { title: string; url: string; source?: string; stance?: "supports" | "refutes" | "context"; note?: string }
+interface SourceCoverage { corroboratingOutlets?: number; contradictingOutlets?: number; socialOnly?: boolean; summary?: string }
 type VerifiedVerdict = "Verified" | "False Information" | "Misleading" | "Partially True" | "Insufficient Evidence";
 interface TextResult {
   isAuthentic: boolean;
@@ -42,8 +45,18 @@ interface TextResult {
   eventSummary?: EventSummary;
   correction?: Correction;
   trustedSources?: TrustedSource[];
+  liveSources?: LiveSource[];
+  liveSearchUsed?: boolean;
+  evidenceUsed?: EvidenceItem[];
+  sourceCoverage?: SourceCoverage;
   verifiedAt?: string;
 }
+
+const STANCE_CLS: Record<string, string> = {
+  supports: "text-success border-success/40 bg-success/10",
+  refutes: "text-destructive border-destructive/40 bg-destructive/10",
+  context: "text-muted-foreground border-border/50 bg-muted/20",
+};
 
 const SEVERITY_CLS: Record<string, string> = {
   low: "bg-muted/40 border-border/50 text-foreground",
@@ -264,6 +277,75 @@ export const TextVerification = () => {
             )}
 
             {/* Trusted sources referenced */}
+            {(result.liveSearchUsed || (result.evidenceUsed && result.evidenceUsed.length > 0)) && (
+              <Card className="glass-panel p-5 animate-glass-ripple">
+                <div className="flex items-center gap-2 mb-3">
+                  <Newspaper className="w-4 h-4 text-primary" />
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                    Live Web &amp; Social Cross-Check
+                  </p>
+                </div>
+
+                {result.sourceCoverage && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                    <div className="p-3 rounded-lg glass-panel border border-success/40">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Corroborating</p>
+                      <p className="text-2xl font-extrabold tabular-nums text-success">{result.sourceCoverage.corroboratingOutlets ?? 0}</p>
+                    </div>
+                    <div className="p-3 rounded-lg glass-panel border border-destructive/40">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Contradicting</p>
+                      <p className="text-2xl font-extrabold tabular-nums text-destructive">{result.sourceCoverage.contradictingOutlets ?? 0}</p>
+                    </div>
+                    <div className="p-3 rounded-lg glass-panel border border-border/50">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Spread</p>
+                      <p className="text-sm font-semibold mt-1">{result.sourceCoverage.socialOnly ? "Social media only" : "Reported by outlets"}</p>
+                    </div>
+                  </div>
+                )}
+                {result.sourceCoverage?.summary && (
+                  <p className="text-sm text-muted-foreground mb-4">{result.sourceCoverage.summary}</p>
+                )}
+
+                {result.evidenceUsed && result.evidenceUsed.length > 0 && (
+                  <div className="space-y-2">
+                    {result.evidenceUsed.map((e, i) => (
+                      <a
+                        key={i}
+                        href={e.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`block p-3 rounded-lg border transition-all hover:-translate-y-0.5 ${STANCE_CLS[e.stance || "context"]}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-foreground line-clamp-1">{e.title || e.url}</span>
+                          <span className="text-[10px] uppercase tracking-wider shrink-0">{e.stance || "context"}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{e.source || e.url}</p>
+                        {e.note && <p className="text-xs text-muted-foreground mt-1">{e.note}</p>}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {result.liveSources && result.liveSources.length > 0 && (
+                  <details className="mt-4">
+                    <summary className="text-xs text-muted-foreground cursor-pointer">
+                      All {result.liveSources.length} live results scanned (news, fact-checkers, X, Reddit, Facebook, Instagram, YouTube)
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      {result.liveSources.map((s, i) => (
+                        <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary">
+                          <span className="px-1.5 py-0.5 rounded bg-muted/40 text-[10px] uppercase shrink-0">{s.group}</span>
+                          <span className="truncate">{s.title || s.url}</span>
+                          <span className="shrink-0 opacity-60">{s.source}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </Card>
+            )}
+
             {result.trustedSources && result.trustedSources.length > 0 && (
               <Card className="glass-panel p-5 animate-glass-ripple">
                 <div className="flex items-center gap-2 mb-3">

@@ -5,6 +5,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const GATEWAY_V2 = 'https://connector-gateway.lovable.dev/firecrawl/v2';
+
+interface WebHit { title: string; url: string; snippet: string; source: string; group: string }
+
+function hostOf(u: string) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } }
+
+async function firecrawlSearch(query: string, group: string, limit: number): Promise<WebHit[]> {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!LOVABLE_API_KEY || !FIRECRAWL_API_KEY) return [];
+  try {
+    const r = await fetch(`${GATEWAY_V2}/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        'X-Connection-Api-Key': FIRECRAWL_API_KEY,
+      },
+      body: JSON.stringify({ query, limit }),
+    });
+    if (!r.ok) {
+      console.error(`Firecrawl search failed [${r.status}] (${group}):`, await r.text());
+      return [];
+    }
+    const d = await r.json();
+    const items = Array.isArray(d?.data) ? d.data : (Array.isArray(d?.data?.web) ? d.data.web : []);
+    return items.map((it: any) => ({
+      title: it.title || '',
+      url: it.url || '',
+      snippet: (it.description || it.markdown || '').slice(0, 400),
+      source: hostOf(it.url || ''),
+      group,
+    })).filter((h: WebHit) => h.url);
+  } catch (e) {
+    console.error('Firecrawl search error:', e);
+    return [];
+  }
+}
+
+async function gatherLiveEvidence(text: string) {
+  const claim = text.replace(/\s+/g, ' ').trim().slice(0, 220);
+  const NEWS = 'site:reuters.com OR site:apnews.com OR site:bbc.com OR site:aljazeera.com OR site:theguardian.com OR site:nytimes.com OR site:indiatoday.in OR site:thehindu.com';
+  const FACT = 'site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:factcheck.afp.com OR site:boomlive.in OR site:altnews.in OR site:reuters.com/fact-check';
+  const SOCIAL = 'site:x.com OR site:twitter.com OR site:reddit.com OR site:facebook.com OR site:instagram.com OR site:youtube.com OR site:threads.net OR site:tiktok.com';
+  const [news, factCheck, social, open] = await Promise.all([
+    firecrawlSearch(`${claim} ${NEWS}`, 'news', 6),
+    firecrawlSearch(`${claim} fact check ${FACT}`, 'fact-checker', 5),
+    firecrawlSearch(`${claim} ${SOCIAL}`, 'social', 6),
+    firecrawlSearch(claim, 'web', 5),
+  ]);
+  return [...news, ...factCheck, ...social, ...open];
+}
+
+function formatEvidence(hits: WebHit[]) {
+  if (!hits.length) return 'NO LIVE WEB RESULTS AVAILABLE. Rely on trained knowledge and say so explicitly.';
+  return hits.map((h, i) => `[${i + 1}] (${h.group} | ${h.source}) ${h.title}\nURL: ${h.url}\nSnippet: ${h.snippet}`).join('\n\n');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -15,6 +73,9 @@ serve(async (req) => {
     if (!text) return new Response(JSON.stringify({ error: 'text is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     console.log('Analyzing text for fake news, propaganda, bias...');
+
+    const liveHits = await gatherLiveEvidence(text);
+    console.log('Live evidence hits:', liveHits.length);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -34,6 +95,8 @@ LAYER 3 Historical/Event Verification — did this event actually occur? When, w
 LAYER 4 Internal Consistency — contradictions, fabricated quotes, missing attribution.
 LAYER 5 Propaganda / Manipulation techniques.
 LAYER 6 Source Credibility & AI-generation signals.
+
+LIVE WEB EVIDENCE: You are given real-time search results from major news agencies, fact-checking organizations, social media platforms (X, Reddit, Facebook, Instagram, YouTube, Threads, TikTok) and the open web. Treat this live evidence as the PRIMARY basis for verification and prefer it over memory. Cross-reference the claim against these results: if multiple reputable outlets corroborate it, lean Verified; if fact-checkers debunk it, lean False Information; if only social posts carry it with no reputable outlet, lean Misleading or Insufficient Evidence. Cite the specific outlets you used.
 
 ENSEMBLE: produce three calibrated probabilities summing to 100 (real + misleading + fake). The final "verdict" is the label with the highest probability. Additionally produce a user-facing "verifiedVerdict" from: "Verified" | "False Information" | "Misleading" | "Partially True" | "Insufficient Evidence".
 
@@ -84,6 +147,15 @@ Return ONLY valid JSON, no markdown, matching exactly:
   },
   "trustedSources": [
     { "name": "e.g. Reuters", "type": "news" | "government" | "fact-checker" | "academic" | "other", "note": "why this source is relevant" }
+  ],
+  "sourceCoverage": {
+    "corroboratingOutlets": number,
+    "contradictingOutlets": number,
+    "socialOnly": boolean,
+    "summary": "1-2 sentences on how widely and by whom this is reported"
+  },
+  "evidenceUsed": [
+    { "title": string, "url": string, "source": string, "stance": "supports" | "refutes" | "context", "note": "what this result showed" }
   ]
 }
 
@@ -95,9 +167,11 @@ Rules:
 - correction.needed MUST be true when verifiedVerdict is any of: False Information, Misleading, Partially True.
 - If you truly do not know, set verifiedVerdict to "Insufficient Evidence" and keep eventSummary fields empty rather than fabricating.
 - Never invent URLs. In trustedSources, name outlets and reasoning only — no fake links.
+- In evidenceUsed, only use URLs that appear verbatim in the LIVE WEB EVIDENCE block. Never fabricate a URL.
+- If the live evidence block is empty, set sourceCoverage counts to 0, evidenceUsed to [], and lower confidence accordingly.
 - Be decisive, concise, and evidence-based.`
           },
-          { role: 'user', content: `Verify this news claim / article / headline:\n\n${text}` }
+          { role: 'user', content: `Verify this news claim / article / headline:\n\n${text}\n\n--- LIVE WEB EVIDENCE (real-time search across news agencies, fact-checkers and social platforms) ---\n${formatEvidence(liveHits)}` }
         ],
       }),
     });
@@ -158,6 +232,8 @@ Rules:
       result.correction.needed = false;
     }
     result.verifiedAt = new Date().toISOString();
+    result.liveSources = liveHits.map((h) => ({ title: h.title, url: h.url, source: h.source, group: h.group }));
+    result.liveSearchUsed = liveHits.length > 0;
 
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
