@@ -232,6 +232,8 @@ Rules:
       result.correction.needed = false;
     }
     result.verifiedAt = new Date().toISOString();
+    result.liveSources = liveHits.map((h) => ({ title: h.title, url: h.url, source: h.source, group: h.group }));
+    result.liveSearchUsed = liveHits.length > 0;
 
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
