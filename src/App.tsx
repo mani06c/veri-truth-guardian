@@ -12,6 +12,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
 import DetectDeepfakesGuide from "./pages/DetectDeepfakesGuide";
+import OAuthConsent from "./pages/OAuthConsent";
 import NotFound from "./pages/NotFound";
 import { TruthAssistant } from "@/components/TruthAssistant";
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/guides/how-to-detect-deepfakes" element={<DetectDeepfakesGuide />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <TruthAssistant />

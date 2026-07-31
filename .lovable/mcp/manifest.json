@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://wobllgntstatmwgtgnpk.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "verifact",
+      "version": "0.1.0",
+      "title": "veriFact"
+    },
+    "tools": [
+      {
+        "name": "verify_text",
+        "title": "Verify a news claim",
+        "description": "Run VeriFact's news verification on a claim, headline or article. Cross-references live news, fact-checkers and social platforms and returns a verdict with probabilities and evidence.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The claim, headline or article text to verify."
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_scans",
+        "title": "List verification scans",
+        "description": "List the signed-in user's recent VeriFact verification scans (text, image, video, audio, url, document) with verdict and confidence.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scan_type": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image",
+                "video",
+                "url",
+                "audio",
+                "document"
+              ],
+              "description": "Optional filter by scan type."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max scans to return (default 20, max 100)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_scan",
+        "title": "Get scan details",
+        "description": "Fetch the full forensic result of one of the signed-in user's VeriFact scans by id, including scores, indicators and explanation.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The scan id (uuid)."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

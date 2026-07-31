@@ -43,11 +43,30 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || "/";
+  const nextParam = new URLSearchParams(location.search).get("next");
+  const safeNext = nextParam && /^\/(?!\/)/.test(nextParam) ? nextParam : null;
+  const from =
+    safeNext ||
+    (location.state as { from?: { pathname: string } } | null)?.from?.pathname ||
+    "/";
+
+  // Preserve the intended destination across full-page OAuth redirects.
+  useEffect(() => {
+    if (safeNext) sessionStorage.setItem("verifact_post_auth_next", safeNext);
+  }, [safeNext]);
 
   useEffect(() => {
-    if (!loading && user) navigate(from, { replace: true });
-  }, [user, loading, from, navigate]);
+    if (!loading && user) {
+      const stored = sessionStorage.getItem("verifact_post_auth_next");
+      const target = safeNext || (stored && /^\/(?!\/)/.test(stored) ? stored : null) || from;
+      sessionStorage.removeItem("verifact_post_auth_next");
+      if (target.startsWith("/.lovable/")) {
+        window.location.href = target;
+      } else {
+        navigate(target, { replace: true });
+      }
+    }
+  }, [user, loading, from, safeNext, navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +86,7 @@ const Auth = () => {
           email: e1,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}${from}`,
             data: { display_name: displayName },
           },
         });
@@ -93,7 +112,7 @@ const Auth = () => {
     setBusy(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth`,
       });
       if (result.error) throw result.error;
       if (result.redirected) return;
