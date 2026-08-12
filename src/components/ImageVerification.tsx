@@ -49,6 +49,10 @@ interface CompressionInfo {
   fileSize: number; megapixels: number; bytesPerPixel: number;
   anomaly: boolean; reason?: string;
 }
+interface AnalysisError {
+  kind: "credits" | "rate-limit" | "general";
+  message: string;
+}
 
 /* ── EXIF + compression helpers ────────────── */
 async function extractExif(file: File): Promise<ExifInfo> {
@@ -108,6 +112,7 @@ export const ImageVerification = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loaderProgress, setLoaderProgress] = useState(0);
   const [result, setResult] = useState<ImageResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<AnalysisError | null>(null);
   const [exifData, setExifData] = useState<ExifInfo | null>(null);
   const [compression, setCompression] = useState<CompressionInfo | null>(null);
   const [forensics, setForensics] = useState<ForensicBundle | null>(null);
@@ -138,6 +143,7 @@ export const ImageVerification = () => {
   ) => {
     setIsAnalyzing(true);
     setResult(null);
+    setAnalysisError(null);
     const startedAt = Date.now();
     try {
       const { data, error } = await supabase.functions.invoke("verify-image", {
@@ -168,8 +174,33 @@ export const ImageVerification = () => {
       // smooth scroll to results after a beat
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
     } catch (err) {
-      console.error("Analysis error:", err);
-      toast.error(err instanceof Error ? err.message : "Analysis failed");
+      let status: number | undefined;
+      let serverMessage = err instanceof Error ? err.message : "Analysis failed";
+      const context = typeof err === "object" && err !== null && "context" in err
+        ? (err as { context?: Response }).context
+        : undefined;
+
+      if (context instanceof Response) {
+        status = context.status;
+        try {
+          const payload = await context.clone().json() as { error?: string };
+          if (payload.error) serverMessage = payload.error;
+        } catch {
+          // Keep the SDK message if the response has no JSON body.
+        }
+      }
+
+      const nextError: AnalysisError = status === 402 || /credits? (?:exhausted|required)|not enough credits/i.test(serverMessage)
+        ? {
+            kind: "credits",
+            message: "Image analysis is temporarily unavailable because this workspace has no AI credits remaining.",
+          }
+        : status === 429
+          ? { kind: "rate-limit", message: "Too many scans were requested. Please wait a moment and try again." }
+          : { kind: "general", message: serverMessage || "Image analysis failed. Please try again." };
+
+      setAnalysisError(nextError);
+      toast.error(nextError.message);
     } finally {
       setIsAnalyzing(false);
     }
@@ -306,7 +337,7 @@ export const ImageVerification = () => {
                       {showRegions ? <><EyeOff className="mr-1 h-3 w-3" />Hide regions</> : <><Eye className="mr-1 h-3 w-3" />Show regions</>}
                     </Button>
                   )}
-                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setExifData(null); setCompression(null); setForensics(null); }}>
+                  <Button variant="outline" className="glass-panel" onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setResult(null); setAnalysisError(null); setExifData(null); setCompression(null); setForensics(null); }}>
                     Remove
                   </Button>
                   <Button className="bg-gradient-primary" disabled={isAnalyzing} onClick={(e) => { e.stopPropagation(); if (selectedImage) runAnalysis(selectedImage, undefined, forensics); }}>
@@ -354,6 +385,38 @@ export const ImageVerification = () => {
                   <Progress value={loaderProgress} className="h-2" />
                   <p className="text-[11px] text-muted-foreground mt-2">{loaderProgress}%</p>
                 </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Expected service errors stay in-page instead of breaking the results view. */}
+      <AnimatePresence>
+        {analysisError && !isAnalyzing && (
+          <motion.div
+            key="analysis-error"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+          >
+            <Card className="glass-panel border-warning/40 p-6">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold">
+                    {analysisError.kind === "credits" ? "AI analysis unavailable" : "Scan could not be completed"}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{analysisError.message}</p>
+                </div>
+                {analysisError.kind !== "credits" && selectedImage && (
+                  <Button
+                    variant="outline"
+                    onClick={() => runAnalysis(selectedImage, undefined, forensics)}
+                  >
+                    Try again
+                  </Button>
+                )}
               </div>
             </Card>
           </motion.div>
